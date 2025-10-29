@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -12,12 +12,16 @@ import {
 import { supabase } from '@/lib/supabase/client';
 import { useToast } from '@/providers/ToastProvider';
 import { useAuth } from '@/providers/AuthProvider';
+import { useThemeMode } from '@/providers/ThemeProvider';
+import type { ThemeColors } from '@/providers/ThemeProvider';
 
 type Mode = 'signin' | 'signup';
 
 export const AuthScreen = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -84,7 +88,7 @@ export const AuthScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={styles.container}
+      style={[styles.container, { backgroundColor: colors.highlightBackground }]}
       behavior={Platform.select({ ios: 'padding', android: undefined })}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
@@ -119,7 +123,7 @@ export const AuthScreen = () => {
               value={fullName}
               onChangeText={setFullName}
               placeholder="Jane Doe"
-              placeholderTextColor="#94a3b8"
+              placeholderTextColor={colors.inputPlaceholder}
               style={styles.input}
               autoCapitalize="words"
             />
@@ -132,7 +136,7 @@ export const AuthScreen = () => {
             value={email}
             onChangeText={setEmail}
             placeholder="you@example.com"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.inputPlaceholder}
             style={styles.input}
             keyboardType="email-address"
             autoCapitalize="none"
@@ -144,8 +148,8 @@ export const AuthScreen = () => {
           <TextInput
             value={password}
             onChangeText={setPassword}
-            placeholder="••••••••"
-            placeholderTextColor="#94a3b8"
+            placeholder="********"
+            placeholderTextColor={colors.inputPlaceholder}
             style={styles.input}
             secureTextEntry
             autoCapitalize="none"
@@ -170,92 +174,91 @@ export const AuthScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#0f172a',
-  },
-  content: {
-    paddingTop: 96,
-    paddingHorizontal: 24,
-    paddingBottom: 48,
-  },
-  title: {
-    fontSize: 32,
-    fontWeight: '700',
-    color: '#f8fafc',
-    marginBottom: 8,
-  },
-  subtitle: {
-    fontSize: 16,
-    color: '#cbd5f5',
-    marginBottom: 32,
-  },
-  segment: {
-    flexDirection: 'row',
-    backgroundColor: '#1e293b',
-    borderRadius: 12,
-    padding: 4,
-    marginBottom: 32,
-  },
-  segmentButton: {
-    flex: 1,
-    borderRadius: 10,
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  segmentButtonActive: {
-    backgroundColor: '#2563eb',
-  },
-  segmentLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#94a3b8',
-  },
-  segmentLabelActive: {
-    color: '#f8fafc',
-  },
-  field: {
-    marginBottom: 20,
-  },
-  label: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: '#e2e8f0',
-    marginBottom: 8,
-  },
-  input: {
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#334155',
-    backgroundColor: '#1e293b',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    color: '#f1f5f9',
-    fontSize: 16,
-  },
-  submitButton: {
-    marginTop: 12,
-    borderRadius: 12,
-    backgroundColor: '#22d3ee',
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  submitButtonDisabled: {
-    opacity: 0.6,
-  },
-  submitLabel: {
-    fontSize: 16,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  switch: {
-    marginTop: 24,
-    alignItems: 'center',
-  },
-  switchLabel: {
-    color: '#e2e8f0',
-    fontSize: 14,
-  },
-});
-
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    content: {
+      paddingTop: 96,
+      paddingHorizontal: 24,
+      paddingBottom: 48,
+    },
+    title: {
+      fontSize: 32,
+      fontWeight: '700',
+      color: colors.highlightText,
+      marginBottom: 8,
+    },
+    subtitle: {
+      fontSize: 16,
+      color: colors.highlightMuted,
+      marginBottom: 32,
+    },
+    segment: {
+      flexDirection: 'row',
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 12,
+      padding: 4,
+      marginBottom: 32,
+    },
+    segmentButton: {
+      flex: 1,
+      borderRadius: 10,
+      paddingVertical: 12,
+      alignItems: 'center',
+    },
+    segmentButtonActive: {
+      backgroundColor: colors.primary,
+    },
+    segmentLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textMuted,
+    },
+    segmentLabelActive: {
+      color: colors.primaryContrast,
+    },
+    field: {
+      marginBottom: 20,
+    },
+    label: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.textSecondary,
+      marginBottom: 8,
+    },
+    input: {
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      backgroundColor: colors.inputBackground,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      color: colors.inputText,
+      fontSize: 16,
+    },
+    submitButton: {
+      marginTop: 12,
+      borderRadius: 12,
+      backgroundColor: colors.secondary,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    submitButtonDisabled: {
+      opacity: 0.6,
+    },
+    submitLabel: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.secondaryContrast,
+    },
+    switch: {
+      marginTop: 24,
+      alignItems: 'center',
+    },
+    switchLabel: {
+      color: colors.highlightMuted,
+      fontSize: 14,
+    },
+  });

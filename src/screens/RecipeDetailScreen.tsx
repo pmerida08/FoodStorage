@@ -1,6 +1,9 @@
+import { useMemo } from 'react';
 import { RouteProp, useRoute } from '@react-navigation/native';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { RootStackParamList } from '@/navigation/types';
+import { useThemeMode } from '@/providers/ThemeProvider';
+import type { ThemeColors } from '@/providers/ThemeProvider';
 
 type Route = RouteProp<RootStackParamList, 'RecipeDetail'>;
 
@@ -43,9 +46,14 @@ export const RecipeDetailScreen = () => {
   const route = useRoute<Route>();
   const recipeKey = (route.params.id ?? '1') as keyof typeof recipeDetails;
   const recipe = recipeDetails[recipeKey] ?? recipeDetails['1'];
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   return (
-    <ScrollView style={styles.container} contentContainerStyle={{ paddingBottom: 32 }}>
+    <ScrollView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      contentContainerStyle={{ paddingBottom: 32 }}
+    >
       <View style={styles.header}>
         <Text style={styles.title}>{recipe.name}</Text>
         <Text style={styles.description}>{recipe.description}</Text>
@@ -72,39 +80,38 @@ export const RecipeDetailScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#f8fafc',
-  },
-  header: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    paddingBottom: 12,
-    gap: 8,
-  },
-  title: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  description: {
-    color: '#475569',
-    lineHeight: 20,
-  },
-  section: {
-    paddingHorizontal: 24,
-    paddingTop: 24,
-    gap: 12,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#0f172a',
-  },
-  item: {
-    color: '#1f2937',
-    lineHeight: 22,
-  },
-});
-
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+    },
+    header: {
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      paddingBottom: 12,
+      gap: 8,
+    },
+    title: {
+      fontSize: 24,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    description: {
+      color: colors.textSecondary,
+      lineHeight: 20,
+    },
+    section: {
+      paddingHorizontal: 24,
+      paddingTop: 24,
+      gap: 12,
+    },
+    sectionTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    item: {
+      color: colors.textSecondary,
+      lineHeight: 22,
+    },
+  });

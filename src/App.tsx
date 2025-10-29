@@ -7,6 +7,12 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { RootNavigator } from '@/navigation/RootNavigator';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { ToastProvider } from '@/providers/ToastProvider';
+import { ThemeProvider, useThemeMode } from '@/providers/ThemeProvider';
+
+const ThemeStatusBar = () => {
+  const { mode } = useThemeMode();
+  return <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />;
+};
 
 export const App = () => {
   const [queryClient] = useState(() => new QueryClient());
@@ -15,10 +21,12 @@ export const App = () => {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ToastProvider>
-            <StatusBar style="dark" />
-            <RootNavigator />
-          </ToastProvider>
+          <ThemeProvider>
+            <ToastProvider>
+              <ThemeStatusBar />
+              <RootNavigator />
+            </ToastProvider>
+          </ThemeProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

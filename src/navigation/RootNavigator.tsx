@@ -1,4 +1,4 @@
-import { NavigationContainer, DefaultTheme } from '@react-navigation/native';
+import { NavigationContainer, DarkTheme, DefaultTheme } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '@/providers/AuthProvider';
@@ -7,10 +7,11 @@ import { AppTabs } from '@/navigation/AppTabs';
 import { AuthScreen } from '@/screens/AuthScreen';
 import { AddItemScreen } from '@/screens/AddItemScreen';
 import { RecipeDetailScreen } from '@/screens/RecipeDetailScreen';
+import { useThemeMode } from '@/providers/ThemeProvider';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
-const navigationTheme = {
+const lightNavigationTheme = {
   ...DefaultTheme,
   colors: {
     ...DefaultTheme.colors,
@@ -22,14 +23,34 @@ const navigationTheme = {
   },
 };
 
-const LoadingState = () => (
-  <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#f8fafc' }}>
-    <ActivityIndicator size="large" color="#2563eb" />
-  </View>
-);
+const darkNavigationTheme = {
+  ...DarkTheme,
+  colors: {
+    ...DarkTheme.colors,
+    primary: '#60a5fa',
+    background: '#0f172a',
+    card: '#1f2937',
+    text: '#f1f5f9',
+    border: '#334155',
+  },
+};
+
+const LoadingState = () => {
+  const { colors } = useThemeMode();
+  return (
+    <View
+      style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}
+    >
+      <ActivityIndicator size="large" color={colors.primary} />
+    </View>
+  );
+};
 
 export const RootNavigator = () => {
   const { user, loading } = useAuth();
+  const { mode } = useThemeMode();
+
+  const navigationTheme = mode === 'dark' ? darkNavigationTheme : lightNavigationTheme;
 
   if (loading) {
     return <LoadingState />;
@@ -59,4 +80,3 @@ export const RootNavigator = () => {
     </NavigationContainer>
   );
 };
-

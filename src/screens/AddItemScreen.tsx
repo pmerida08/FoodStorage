@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   KeyboardAvoidingView,
   Platform,
@@ -13,12 +13,16 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useToast } from '@/providers/ToastProvider';
+import { useThemeMode } from '@/providers/ThemeProvider';
+import type { ThemeColors } from '@/providers/ThemeProvider';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
 export const AddItemScreen = () => {
   const navigation = useNavigation<Navigation>();
   const { showToast } = useToast();
+  const { colors } = useThemeMode();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [form, setForm] = useState({
     name: '',
     quantity: '',
@@ -43,7 +47,7 @@ export const AddItemScreen = () => {
 
   return (
     <KeyboardAvoidingView
-      style={{ flex: 1, backgroundColor: '#f8fafc' }}
+      style={{ flex: 1, backgroundColor: colors.background }}
       behavior={Platform.select({ ios: 'padding', android: undefined })}
     >
       <ScrollView contentContainerStyle={styles.container}>
@@ -52,7 +56,7 @@ export const AddItemScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="e.g. Chicken Breast"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.inputPlaceholder}
             value={form.name}
             onChangeText={(value) => setField('name', value)}
           />
@@ -63,7 +67,7 @@ export const AddItemScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="e.g. 500g or 2 pieces"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.inputPlaceholder}
             value={form.quantity}
             onChangeText={(value) => setField('quantity', value)}
           />
@@ -74,7 +78,7 @@ export const AddItemScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="freezer, fridge, larder..."
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.inputPlaceholder}
             value={form.location}
             onChangeText={(value) => setField('location', value)}
           />
@@ -85,7 +89,7 @@ export const AddItemScreen = () => {
           <TextInput
             style={styles.input}
             placeholder="YYYY-MM-DD"
-            placeholderTextColor="#94a3b8"
+            placeholderTextColor={colors.inputPlaceholder}
             value={form.expiryDate}
             onChangeText={(value) => setField('expiryDate', value)}
           />
@@ -103,40 +107,40 @@ export const AddItemScreen = () => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    padding: 24,
-    gap: 24,
-  },
-  section: {
-    gap: 8,
-  },
-  label: {
-    fontSize: 15,
-    fontWeight: '600',
-    color: '#0f172a',
-  },
-  input: {
-    borderRadius: 14,
-    borderWidth: 1,
-    borderColor: '#cbd5f5',
-    backgroundColor: '#ffffff',
-    paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontSize: 16,
-    color: '#0f172a',
-  },
-  submit: {
-    marginTop: 8,
-    backgroundColor: '#2563eb',
-    borderRadius: 14,
-    paddingVertical: 16,
-    alignItems: 'center',
-  },
-  submitText: {
-    color: '#f8fafc',
-    fontSize: 16,
-    fontWeight: '700',
-  },
-});
-
+const createStyles = (colors: ThemeColors) =>
+  StyleSheet.create({
+    container: {
+      padding: 24,
+      gap: 24,
+    },
+    section: {
+      gap: 8,
+    },
+    label: {
+      fontSize: 15,
+      fontWeight: '600',
+      color: colors.textPrimary,
+    },
+    input: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      backgroundColor: colors.inputBackground,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      fontSize: 16,
+      color: colors.inputText,
+    },
+    submit: {
+      marginTop: 8,
+      backgroundColor: colors.primary,
+      borderRadius: 14,
+      paddingVertical: 16,
+      alignItems: 'center',
+    },
+    submitText: {
+      color: colors.primaryContrast,
+      fontSize: 16,
+      fontWeight: '700',
+    },
+  });

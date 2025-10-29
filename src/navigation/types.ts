@@ -5,6 +5,7 @@ export type AppTabsParamList = {
   Storage: undefined;
   Recipes: undefined;
   Favorites: undefined;
+  Profile: undefined;
 };
 
 export type RootStackParamList = {
@@ -13,4 +14,3 @@ export type RootStackParamList = {
   AddItem: undefined;
   RecipeDetail: { id: string };
 };
-
