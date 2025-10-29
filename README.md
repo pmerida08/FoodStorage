@@ -1,50 +1,103 @@
-# Welcome to your Expo app 👋
+# 🫙 FoodStorage
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+FoodStorage is a modern pantry companion built with Expo + React Native. Keep an eye on what’s in your fridge, spin up recipe ideas from what you already have, and manage your household kitchen with a single app.
 
-## Get started
+---
 
-1. Install dependencies
+## ✨ Highlights
 
-   ```bash
-   npm install
-   ```
+- Smart storage cards with expiry tracking and status badges.
+- AI-inspired recipe generator mock for future integrations.
+- Light & dark themes wired through a custom `ThemeProvider`.
+- Supabase-ready authentication flow with profile management.
+- Floating bottom navigation for quick access to every section.
 
-2. Start the app
+---
 
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## 🚀 Quick Start
 
 ```bash
-npm run reset-project
+# install dependencies
+npm install
+
+# run on web / iOS / Android
+npx expo start
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Pick the platform from Expo Dev Tools or press the corresponding key in the terminal prompt.
 
-## Learn more
+---
 
-To learn more about developing your project with Expo, look at the following resources:
+## 🧭 App Map
 
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
+- `Home`: snapshot of inventory health and upcoming expirations.
+- `Storage`: searchable list of pantry items with status tags.
+- `Recipes`: curated suggestions plus a generator action.
+- `Favorites`: bookmark future meal wins.
+- `Profile`: update identity, toggle theme, manage credentials.
 
-## Join the community
+---
 
-Join our community of developers creating universal apps.
+## 🛠️ Stack
 
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+- **Framework**: Expo (React Native)
+- **Navigation**: React Navigation (stack + tabs)
+- **State & Data**: React Query, Supabase JS client
+- **UI**: React Native core components, `lucide-react-native` icons
+- **Tooling**: TypeScript, ESLint, Babel
+
+---
+
+## 📂 Project Layout
+
+```
+src/
+├─ navigation/     # navigators, tab config, param types
+├─ providers/      # theme, auth, toast context providers
+├─ screens/        # feature screens (Storage, Recipes, Profile, etc.)
+├─ lib/            # Supabase client + generated types
+├─ assets/         # fonts, images, design tokens
+└─ scripts/        # helper scripts for CI or maintenance
+```
+
+---
+
+## 🎛️ Available Scripts
+
+```bash
+npm run lint        # lint with ESLint
+npm run typecheck   # validate TypeScript types
+npm run android     # open Android emulator (requires setup)
+npm run ios         # open iOS simulator (macOS only)
+npm run web         # run in the browser
+```
+
+---
+
+## 🎨 Theming Tips
+
+- Theme colors live in `src/providers/ThemeProvider.tsx`.
+- Access colors via `useThemeMode()` for consistent styling.
+- Components should consume theme tokens instead of hardcoded hex values.
+
+---
+
+## 🔒 Auth & Data
+
+- Supabase is preconfigured for email-based auth.
+- Profile data syncs through React Query (`profile` cache key).
+- Mocked recipe/storage datasets make the app demo-friendly even without a backend.
+
+---
+
+## 🤝 Contributing
+
+1. Fork & create a feature branch.
+2. Stick to TypeScript + ESLint conventions (`npm run lint`).
+3. Open a PR describing the change, screenshots welcome!
+
+---
+
+## 📬 Support
+
+Questions, suggestions, or bug reports? Open an issue or reach the maintainer directly. Happy cooking!
