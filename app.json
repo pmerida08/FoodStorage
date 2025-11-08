@@ -14,6 +14,7 @@
     },
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.pmerida.mobile",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow FoodStorage to capture receipts so we can detect the products you bought.",
         "NSPhotoLibraryUsageDescription": "Allow FoodStorage to read receipt photos so we can detect the products you bought."
@@ -40,6 +41,12 @@
           "cameraPermission": "Allow FoodStorage to capture receipts so we can detect the products you bought."
         }
       ]
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "14ee0f97-ef2c-460f-b5d3-7c8f060891b8"
+      }
+    },
+    "owner": "pmerida"
   }
 }

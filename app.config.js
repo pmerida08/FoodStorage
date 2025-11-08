@@ -14,6 +14,7 @@ module.exports = {
     },
     ios: {
       supportsTablet: true,
+      bundleIdentifier: 'com.pmerida.mobile',
     },
     android: {
       adaptiveIcon: {
@@ -30,6 +31,10 @@ module.exports = {
     plugins: ['expo-secure-store'],
     extra: {
       translationApiKey: process.env.EXPO_PUBLIC_TRANSLATION_API_KEY,
+      eas: {
+        projectId: '14ee0f97-ef2c-460f-b5d3-7c8f060891b8',
+      },
     },
+    owner: 'pmerida',
   },
 };
