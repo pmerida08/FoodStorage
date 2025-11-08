@@ -13,7 +13,11 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "Allow FoodStorage to capture receipts so we can detect the products you bought.",
+        "NSPhotoLibraryUsageDescription": "Allow FoodStorage to read receipt photos so we can detect the products you bought."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -28,7 +32,14 @@
       "favicon": "./assets/favicon.png"
     },
     "plugins": [
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow FoodStorage to read receipt photos so we can detect the products you bought.",
+          "cameraPermission": "Allow FoodStorage to capture receipts so we can detect the products you bought."
+        }
+      ]
     ]
   }
 }

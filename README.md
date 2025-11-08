@@ -8,6 +8,7 @@ FoodStorage is a modern pantry companion built with Expo + React Native. Keep an
 
 - Smart storage cards with expiry tracking and status badges.
 - AI-inspired recipe generator mock for future integrations.
+- On-device receipt OCR to turn grocery tickets into storage items automatically.
 - Light & dark themes wired through a custom `ThemeProvider`.
 - Supabase-ready authentication flow with profile management.
 - Floating bottom navigation for quick access to every section.
@@ -101,3 +102,5 @@ npm run web         # run in the browser
 ## 📬 Support
 
 Questions, suggestions, or bug reports? Open an issue or reach the maintainer directly. Happy cooking!
+
+---
