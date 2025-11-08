@@ -8,19 +8,80 @@ import { ChefHat, Package, Refrigerator, Snowflake, TrendingUp } from 'lucide-re
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-
-const storageData = [
-  { id: 'freezer', name: 'Freezer', items: 12, expiringSoon: 2, icon: Snowflake, color: '#38bdf8' },
-  { id: 'fridge', name: 'Fridge', items: 18, expiringSoon: 4, icon: Refrigerator, color: '#34d399' },
-  { id: 'larder', name: 'Larder', items: 24, expiringSoon: 1, icon: Package, color: '#facc15' },
-];
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/providers/AuthProvider';
+import { useQuery } from '@tanstack/react-query';
+import { getStorageItemsByLocation, getStorageStatistics } from '@/lib/supabase/storageService';
 
 type Navigation = BottomTabNavigationProp<AppTabsParamList, 'Home'>;
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Navigation>();
   const { colors } = useThemeMode();
+  const { t } = useTranslation();
+  const { user } = useAuth();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const { data: freezerItems = [] } = useQuery({
+    queryKey: ['storage-items', user?.id, 'freezer'],
+    queryFn: () => getStorageItemsByLocation(user!.id, 'freezer'),
+    enabled: Boolean(user?.id),
+  });
+
+  const { data: fridgeItems = [] } = useQuery({
+    queryKey: ['storage-items', user?.id, 'fridge'],
+    queryFn: () => getStorageItemsByLocation(user!.id, 'fridge'),
+    enabled: Boolean(user?.id),
+  });
+
+  const { data: larderItems = [] } = useQuery({
+    queryKey: ['storage-items', user?.id, 'larder'],
+    queryFn: () => getStorageItemsByLocation(user!.id, 'larder'),
+    enabled: Boolean(user?.id),
+  });
+
+  const { data: statistics } = useQuery({
+    queryKey: ['storage-statistics', user?.id],
+    queryFn: () => getStorageStatistics(user!.id),
+    enabled: Boolean(user?.id),
+  });
+
+  const getExpiringSoonCount = (items: any[]) => {
+    const now = new Date();
+    const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    return items.filter((item) => {
+      if (!item.expiry_date) return false;
+      const expiryDate = new Date(item.expiry_date);
+      return expiryDate > now && expiryDate <= sevenDaysFromNow;
+    }).length;
+  };
+
+  const storageData = useMemo(() => [
+    {
+      id: 'freezer',
+      name: t('home.freezer'),
+      items: freezerItems.length,
+      expiringSoon: getExpiringSoonCount(freezerItems),
+      icon: Snowflake,
+      color: '#38bdf8'
+    },
+    {
+      id: 'fridge',
+      name: t('home.fridge'),
+      items: fridgeItems.length,
+      expiringSoon: getExpiringSoonCount(fridgeItems),
+      icon: Refrigerator,
+      color: '#34d399'
+    },
+    {
+      id: 'larder',
+      name: t('home.larder'),
+      items: larderItems.length,
+      expiringSoon: getExpiringSoonCount(larderItems),
+      icon: Package,
+      color: '#facc15'
+    },
+  ], [t, freezerItems, fridgeItems, larderItems]);
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -29,16 +90,20 @@ export const HomeScreen = () => {
         contentContainerStyle={{ paddingBottom: 32 }}
       >
         <LinearGradient colors={colors.heroGradient} style={styles.hero}>
-          <Text style={styles.greeting}>Welcome back!</Text>
-          <Text style={styles.subtitle}>Let&apos;s manage your food storage</Text>
+          <Text style={styles.greeting}>{t('home.welcome')}</Text>
+          <Text style={styles.subtitle}>{t('home.subtitle')}</Text>
         </LinearGradient>
 
         <View style={styles.body}>
           <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>Your Storage</Text>
-            <View style={styles.badge}>
-              <Text style={styles.badgeText}>7 expiring soon</Text>
-            </View>
+            <Text style={styles.sectionTitle}>{t('home.yourStorage')}</Text>
+            {statistics && statistics.expiringSoon > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {statistics.expiringSoon} {t('home.expiringSoon')}
+                </Text>
+              </View>
+            )}
           </View>
 
           {storageData.map((storage) => (
@@ -49,11 +114,11 @@ export const HomeScreen = () => {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{storage.name}</Text>
-                  <Text style={styles.cardSubtitle}>{storage.items} items</Text>
+                  <Text style={styles.cardSubtitle}>{storage.items} {t('home.items')}</Text>
                 </View>
                 {storage.expiringSoon > 0 && (
                   <View style={styles.expiringBadge}>
-                    <Text style={styles.expiringText}>{storage.expiringSoon} expiring</Text>
+                    <Text style={styles.expiringText}>{storage.expiringSoon} {t('home.expiring')}</Text>
                   </View>
                 )}
               </View>
@@ -65,28 +130,28 @@ export const HomeScreen = () => {
               <TrendingUp size={28} color={colors.secondary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.highlightTitle}>Generate Smart Recipes</Text>
+              <Text style={styles.highlightTitle}>{t('home.smartRecipes')}</Text>
               <Text style={styles.highlightSubtitle}>
-                AI will suggest recipes based on what you have in stock.
+                {t('home.smartRecipesDesc')}
               </Text>
               <TouchableOpacity
                 style={styles.highlightButton}
                 onPress={() => navigation.navigate('Recipes')}
               >
                 <ChefHat size={18} color={colors.highlightButtonText} />
-                <Text style={styles.highlightButtonText}>Get Recipe Ideas</Text>
+                <Text style={styles.highlightButtonText}>{t('home.getRecipeIdeas')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           <View style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
-              <Text style={styles.statValue}>54</Text>
-              <Text style={styles.statLabel}>Total Items</Text>
+              <Text style={styles.statValue}>{statistics?.totalItems || 0}</Text>
+              <Text style={styles.statLabel}>{t('home.totalItems')}</Text>
             </View>
             <View style={[styles.statCard, { backgroundColor: colors.secondary }]}>
-              <Text style={styles.statValue}>12</Text>
-              <Text style={styles.statLabel}>Favorites</Text>
+              <Text style={styles.statValue}>{statistics?.expiringSoon || 0}</Text>
+              <Text style={styles.statLabel}>{t('home.expiringSoon')}</Text>
             </View>
           </View>
         </View>

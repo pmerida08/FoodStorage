@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, Sparkles, Clock, Users } from 'lucide-react-native';
@@ -7,6 +7,9 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import type { RootStackParamList } from '@/navigation/types';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
+import { useTranslation } from 'react-i18next';
+import { useLanguage } from '@/providers/LanguageProvider';
+import { translateText } from '@/lib/i18n/contentTranslation';
 
 const mockRecipes = [
   { id: '1', name: 'Creamy Chicken Pasta', matchScore: 85, time: '25 min', servings: 4, missing: 2 },
@@ -16,16 +19,40 @@ const mockRecipes = [
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
+type TranslatedRecipe = typeof mockRecipes[number] & { translatedName: string };
+
 export const RecipesScreen = () => {
   const navigation = useNavigation<Navigation>();
   const [query, setQuery] = useState('');
   const [generating, setGenerating] = useState(false);
   const { colors } = useThemeMode();
+  const { t } = useTranslation();
+  const { language } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
+  const [translatedRecipes, setTranslatedRecipes] = useState<TranslatedRecipe[]>(
+    mockRecipes.map((r) => ({ ...r, translatedName: r.name })),
+  );
+
+  useEffect(() => {
+    const translateRecipeNames = async () => {
+      const translated = await Promise.all(
+        mockRecipes.map(async (recipe) => ({
+          ...recipe,
+          translatedName: await translateText(recipe.name, language),
+        })),
+      );
+      setTranslatedRecipes(translated);
+    };
+
+    translateRecipeNames();
+  }, [language]);
+
   const filtered = useMemo(() => {
-    return mockRecipes.filter((recipe) => recipe.name.toLowerCase().includes(query.toLowerCase()));
-  }, [query]);
+    return translatedRecipes.filter((recipe) =>
+      recipe.translatedName.toLowerCase().includes(query.toLowerCase()),
+    );
+  }, [query, translatedRecipes]);
 
   const handleGenerate = () => {
     setGenerating(true);
@@ -40,13 +67,13 @@ export const RecipesScreen = () => {
         ListHeaderComponent={
           <>
             <View style={styles.header}>
-              <Text style={styles.title}>Recipe Generator</Text>
+              <Text style={styles.title}>{t('recipes.title')}</Text>
               <View style={styles.searchWrapper}>
                 <Search size={18} color={colors.inputPlaceholder} style={{ marginRight: 8 }} />
                 <TextInput
                   value={query}
                   onChangeText={setQuery}
-                  placeholder="Search recipes..."
+                  placeholder={t('recipes.searchPlaceholder')}
                   placeholderTextColor={colors.inputPlaceholder}
                   style={styles.search}
                 />
@@ -58,15 +85,15 @@ export const RecipesScreen = () => {
               >
                 <Sparkles size={18} color={colors.highlightButtonText} />
                 <Text style={styles.generateLabel}>
-                  {generating ? 'Generating...' : 'Generate Smart Recipes'}
+                  {generating ? t('recipes.generating') : t('recipes.generateSmart')}
                 </Text>
               </TouchableOpacity>
             </View>
 
             <View style={styles.resultsHeader}>
-              <Text style={styles.resultsTitle}>Suggested Recipes</Text>
+              <Text style={styles.resultsTitle}>{t('recipes.suggestedRecipes')}</Text>
               <View style={styles.resultsBadge}>
-                <Text style={styles.resultsBadgeText}>{filtered.length} matches</Text>
+                <Text style={styles.resultsBadgeText}>{filtered.length} {t('recipes.matches')}</Text>
               </View>
             </View>
           </>
@@ -80,10 +107,10 @@ export const RecipesScreen = () => {
             onPress={() => navigation.navigate('RecipeDetail', { id: item.id })}
           >
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.name}</Text>
+              <Text style={styles.cardTitle}>{item.translatedName}</Text>
               <View style={styles.match}>
                 <Text style={styles.matchValue}>{item.matchScore}%</Text>
-                <Text style={styles.matchLabel}>match</Text>
+                <Text style={styles.matchLabel}>{t('recipes.match')}</Text>
               </View>
             </View>
             <View style={styles.metaRow}>
@@ -93,7 +120,7 @@ export const RecipesScreen = () => {
               </View>
               <View style={styles.metaItem}>
                 <Users size={16} color={colors.textMuted} />
-                <Text style={styles.metaLabel}>{item.servings} servings</Text>
+                <Text style={styles.metaLabel}>{item.servings} {t('recipes.servings')}</Text>
               </View>
             </View>
             <View
@@ -111,8 +138,8 @@ export const RecipesScreen = () => {
                 ]}
               >
                 {item.missing === 0
-                  ? 'All ingredients available'
-                  : `${item.missing} ingredients needed`}
+                  ? t('recipes.allIngredientsAvailable')
+                  : `${item.missing} ${t('recipes.ingredientsNeeded')}`}
               </Text>
             </View>
           </TouchableOpacity>

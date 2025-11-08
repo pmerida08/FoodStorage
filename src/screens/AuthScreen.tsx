@@ -14,6 +14,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
+import { useTranslation } from 'react-i18next';
 
 type Mode = 'signin' | 'signup';
 
@@ -21,6 +22,7 @@ export const AuthScreen = () => {
   const { showToast } = useToast();
   const { user } = useAuth();
   const { colors } = useThemeMode();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<Mode>('signin');
   const [email, setEmail] = useState('');
@@ -45,9 +47,9 @@ export const AuthScreen = () => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      showToast({ title: 'Sign in failed', message: error.message, type: 'error' });
+      showToast({ title: t('auth.signInFailed'), message: error.message, type: 'error' });
     } else {
-      showToast({ title: 'Welcome back!', message: 'Signed in successfully', type: 'success' });
+      showToast({ title: t('auth.welcomeBack'), message: t('auth.signInSuccess'), type: 'success' });
     }
 
     setLoading(false);
@@ -64,11 +66,11 @@ export const AuthScreen = () => {
     });
 
     if (error) {
-      showToast({ title: 'Sign up failed', message: error.message, type: 'error' });
+      showToast({ title: t('auth.signUpFailed'), message: error.message, type: 'error' });
     } else {
       showToast({
-        title: 'Check your inbox',
-        message: 'We sent you a confirmation email to complete sign up.',
+        title: t('auth.checkInbox'),
+        message: t('auth.confirmationEmail'),
         type: 'success',
       });
       setFullName('');
@@ -92,9 +94,9 @@ export const AuthScreen = () => {
       behavior={Platform.select({ ios: 'padding', android: undefined })}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>Food Storage</Text>
+        <Text style={styles.title}>{t('auth.title')}</Text>
         <Text style={styles.subtitle}>
-          {mode === 'signin' ? 'Sign in to continue' : 'Create a new account'}
+          {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
         </Text>
 
         <View style={styles.segment}>
@@ -103,7 +105,7 @@ export const AuthScreen = () => {
             onPress={() => setMode('signin')}
           >
             <Text style={[styles.segmentLabel, mode === 'signin' && styles.segmentLabelActive]}>
-              Sign In
+              {t('auth.signIn')}
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
@@ -111,18 +113,18 @@ export const AuthScreen = () => {
             onPress={() => setMode('signup')}
           >
             <Text style={[styles.segmentLabel, mode === 'signup' && styles.segmentLabelActive]}>
-              Sign Up
+              {t('auth.signUp')}
             </Text>
           </TouchableOpacity>
         </View>
 
         {mode === 'signup' && (
           <View style={styles.field}>
-            <Text style={styles.label}>Full name</Text>
+            <Text style={styles.label}>{t('auth.fullName')}</Text>
             <TextInput
               value={fullName}
               onChangeText={setFullName}
-              placeholder="Jane Doe"
+              placeholder={t('auth.fullNamePlaceholder')}
               placeholderTextColor={colors.inputPlaceholder}
               style={styles.input}
               autoCapitalize="words"
@@ -131,11 +133,11 @@ export const AuthScreen = () => {
         )}
 
         <View style={styles.field}>
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>{t('auth.email')}</Text>
           <TextInput
             value={email}
             onChangeText={setEmail}
-            placeholder="you@example.com"
+            placeholder={t('auth.emailPlaceholder')}
             placeholderTextColor={colors.inputPlaceholder}
             style={styles.input}
             keyboardType="email-address"
@@ -144,11 +146,11 @@ export const AuthScreen = () => {
         </View>
 
         <View style={styles.field}>
-          <Text style={styles.label}>Password</Text>
+          <Text style={styles.label}>{t('auth.password')}</Text>
           <TextInput
             value={password}
             onChangeText={setPassword}
-            placeholder="********"
+            placeholder={t('auth.passwordPlaceholder')}
             placeholderTextColor={colors.inputPlaceholder}
             style={styles.input}
             secureTextEntry
@@ -161,12 +163,12 @@ export const AuthScreen = () => {
           onPress={handleSubmit}
           disabled={loading}
         >
-          <Text style={styles.submitLabel}>{loading ? 'Please wait...' : 'Continue'}</Text>
+          <Text style={styles.submitLabel}>{loading ? t('auth.pleaseWait') : t('auth.continue')}</Text>
         </TouchableOpacity>
 
         <TouchableOpacity onPress={toggleMode} style={styles.switch}>
           <Text style={styles.switchLabel}>
-            {mode === 'signin' ? "Don't have an account? Sign Up" : 'Already registered? Sign In'}
+            {mode === 'signin' ? t('auth.noAccount') : t('auth.hasAccount')}
           </Text>
         </TouchableOpacity>
       </ScrollView>

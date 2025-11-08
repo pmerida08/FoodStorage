@@ -3,10 +3,18 @@ import type { ThemeColors } from '@/providers/ThemeProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Calendar, Package2, Plus, Search } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { Calendar, Package2, Plus, Search, Snowflake, Refrigerator, Package } from 'lucide-react-native';
+import { useMemo, useState, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useAuth } from '@/providers/AuthProvider';
+import { useQuery } from '@tanstack/react-query';
+import { getStorageItems, getItemStatus } from '@/lib/supabase/storageService';
+import { useLanguage } from '@/providers/LanguageProvider';
+import { translateText } from '@/lib/i18n/contentTranslation';
 import {
+  ActivityIndicator,
   FlatList,
+  RefreshControl,
   StyleSheet,
   Text,
   TextInput,
@@ -15,70 +23,244 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-const mockItems = [
-  { id: '1', name: 'Chicken Breast', quantity: '500g', expiryDate: '2025-11-05', status: 'fresh' },
-  { id: '2', name: 'Milk', quantity: '1L', expiryDate: '2025-10-28', status: 'expiring' },
-  { id: '3', name: 'Pasta', quantity: '2 packages', expiryDate: '2026-03-15', status: 'fresh' },
-  { id: '4', name: 'Ground Beef', quantity: '400g', expiryDate: '2025-10-27', status: 'expiring' },
-  { id: '5', name: 'Cheddar Cheese', quantity: '200g', expiryDate: '2025-11-10', status: 'fresh' },
-] as const;
-
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
+
+type TranslatedItem = ReturnType<typeof getStorageItems> extends Promise<infer T>
+  ? T[number] & { translatedName: string }
+  : never;
+
+type LocationFilter = 'all' | 'freezer' | 'fridge' | 'larder';
 
 export const StorageScreen = () => {
   const navigation = useNavigation<Navigation>();
   const [query, setQuery] = useState('');
+  const [locationFilter, setLocationFilter] = useState<LocationFilter>('all');
   const { colors } = useThemeMode();
+  const { t } = useTranslation();
+  const { user } = useAuth();
+  const { language } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
+
+  const locationConfig = useMemo(
+    () => ({
+      freezer: {
+        name: t('home.freezer'),
+        icon: Snowflake,
+        color: '#38bdf8',
+        backgroundColor: '#38bdf822',
+      },
+      fridge: {
+        name: t('home.fridge'),
+        icon: Refrigerator,
+        color: '#34d399',
+        backgroundColor: '#34d39922',
+      },
+      larder: {
+        name: t('home.larder'),
+        icon: Package,
+        color: '#facc15',
+        backgroundColor: '#facc1522',
+      },
+    }),
+    [t],
+  );
+
+  const {
+    data: items = [],
+    isLoading,
+    isRefetching,
+    refetch,
+  } = useQuery({
+    queryKey: ['storage-items', user?.id],
+    queryFn: () => getStorageItems(user!.id),
+    enabled: Boolean(user?.id),
+  });
+
+  const [translatedItems, setTranslatedItems] = useState<TranslatedItem[]>([]);
+
+  useEffect(() => {
+    const translateItems = async () => {
+      const translated = await Promise.all(
+        items.map(async (item) => ({
+          ...item,
+          translatedName: await translateText(item.name, language),
+        })),
+      );
+      setTranslatedItems(translated);
+    };
+
+    if (items.length > 0) {
+      translateItems();
+    }
+  }, [items, language]);
 
   const statusConfig = useMemo(
     () => ({
-      fresh: { label: 'Fresh', backgroundColor: colors.successSoft, color: colors.success },
-      expiring: { label: 'Expiring Soon', backgroundColor: colors.warningSoft, color: colors.warning },
-      expired: { label: 'Expired', backgroundColor: colors.dangerSoft, color: colors.danger },
+      fresh: { label: t('storage.fresh'), backgroundColor: colors.successSoft, color: colors.success },
+      expiring: { label: t('storage.expiringSoon'), backgroundColor: colors.warningSoft, color: colors.warning },
+      expired: { label: t('storage.expired'), backgroundColor: colors.dangerSoft, color: colors.danger },
     }),
-    [colors.danger, colors.dangerSoft, colors.success, colors.successSoft, colors.warning, colors.warningSoft],
+    [colors.danger, colors.dangerSoft, colors.success, colors.successSoft, colors.warning, colors.warningSoft, t],
   );
 
   const filtered = useMemo(() => {
-    return mockItems.filter((item) => item.name.toLowerCase().includes(query.toLowerCase()));
-  }, [query]);
+    let result = translatedItems;
+
+    // Filter by location
+    if (locationFilter !== 'all') {
+      result = result.filter(
+        (item) => item.storage_locations?.type === locationFilter,
+      );
+    }
+
+    // Filter by search query
+    if (query) {
+      result = result.filter((item) =>
+        item.translatedName.toLowerCase().includes(query.toLowerCase()),
+      );
+    }
+
+    return result;
+  }, [translatedItems, query, locationFilter]);
+
+  if (isLoading && !items.length) {
+    return (
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+        <View style={styles.loadingState}>
+          <ActivityIndicator color={colors.primary} size="large" />
+          <Text style={[styles.loadingLabel, { color: colors.textSecondary }]}>
+            {t('storage.title')}...
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefetching}
+            onRefresh={() => {
+              void refetch();
+            }}
+            tintColor={colors.primary}
+          />
+        }
         ListHeaderComponent={
-          <View style={styles.header}>
-            <Text style={styles.title}>Storage</Text>
-            <View style={styles.searchWrapper}>
-              <Search size={18} color={colors.inputPlaceholder} style={{ marginRight: 8 }} />
-              <TextInput
-                value={query}
-                onChangeText={setQuery}
-                placeholder="Search items..."
-                placeholderTextColor={colors.inputPlaceholder}
-                style={styles.search}
-              />
+          <>
+            <View style={styles.header}>
+              <Text style={styles.title}>{t('storage.title')}</Text>
+              <View style={styles.searchWrapper}>
+                <Search size={18} color={colors.inputPlaceholder} style={{ marginRight: 8 }} />
+                <TextInput
+                  value={query}
+                  onChangeText={setQuery}
+                  placeholder={t('storage.searchPlaceholder')}
+                  placeholderTextColor={colors.inputPlaceholder}
+                  style={styles.search}
+                />
+              </View>
             </View>
-          </View>
+
+            <View style={styles.filterContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.filterButton,
+                  locationFilter === 'all' && styles.filterButtonActive,
+                  { borderColor: locationFilter === 'all' ? colors.primary : colors.border },
+                ]}
+                onPress={() => setLocationFilter('all')}
+              >
+                <Text
+                  style={[
+                    styles.filterButtonText,
+                    { color: locationFilter === 'all' ? colors.primary : colors.textSecondary },
+                  ]}
+                >
+                  {t('common.all') || 'All'}
+                </Text>
+              </TouchableOpacity>
+
+              {(Object.keys(locationConfig) as Array<keyof typeof locationConfig>).map((locType) => {
+                const config = locationConfig[locType];
+                const Icon = config.icon;
+                const isActive = locationFilter === locType;
+
+                return (
+                  <TouchableOpacity
+                    key={locType}
+                    style={[
+                      styles.filterButton,
+                      isActive && styles.filterButtonActive,
+                      { borderColor: isActive ? config.color : colors.border },
+                    ]}
+                    onPress={() => setLocationFilter(locType)}
+                  >
+                    <Icon size={16} color={isActive ? config.color : colors.textSecondary} />
+                    <Text
+                      style={[
+                        styles.filterButtonText,
+                        { color: isActive ? config.color : colors.textSecondary },
+                      ]}
+                    >
+                      {config.name}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
         }
         ListHeaderComponentStyle={styles.listHeader}
         contentContainerStyle={styles.list}
         ItemSeparatorComponent={() => <View style={styles.separator} />}
+        ListEmptyComponent={
+          <View style={styles.emptyState}>
+            <Package2 size={48} color={colors.textMuted} />
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No items yet</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
+              Add items to start tracking your food storage
+            </Text>
+          </View>
+        }
         renderItem={({ item }) => {
-          const status = statusConfig[item.status as keyof typeof statusConfig];
+          const itemStatus = getItemStatus(item.expiry_date);
+          const status = statusConfig[itemStatus];
+          const displayQuantity = item.quantity && item.unit ? `${item.quantity} ${item.unit}` : item.quantity || '';
+
+          const locationType = item.storage_locations?.type as keyof typeof locationConfig;
+          const locationInfo = locationConfig[locationType];
+          const LocationIcon = locationInfo?.icon || Package2;
+
           return (
             <View style={styles.card}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardTitleContainer}>
-                  <View style={styles.icon}>
-                    <Package2 size={20} color={colors.primary} />
+                  <View
+                    style={[
+                      styles.icon,
+                      {
+                        backgroundColor: locationInfo?.backgroundColor || colors.primarySoft,
+                      },
+                    ]}
+                  >
+                    <LocationIcon size={20} color={locationInfo?.color || colors.primary} />
                   </View>
-                  <View>
-                    <Text style={styles.cardTitle}>{item.name}</Text>
-                    <Text style={styles.cardSubtitle}>{item.quantity}</Text>
+                  <View style={styles.cardTextContainer}>
+                    <Text style={styles.cardTitle}>{item.translatedName}</Text>
+                    <View style={styles.cardSubtitleRow}>
+                      {displayQuantity ? <Text style={styles.cardSubtitle}>{displayQuantity}</Text> : null}
+                      {displayQuantity && locationInfo && <Text style={styles.cardSubtitle}> • </Text>}
+                      {locationInfo && (
+                        <Text style={[styles.cardSubtitle, { color: locationInfo.color }]}>
+                          {locationInfo.name}
+                        </Text>
+                      )}
+                    </View>
                   </View>
                 </View>
                 <View
@@ -90,12 +272,14 @@ export const StorageScreen = () => {
                   <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
                 </View>
               </View>
-              <View style={styles.cardFooter}>
-                <Calendar size={16} color={colors.textMuted} />
-                <Text style={styles.cardFooterText}>
-                  Expires: {new Date(item.expiryDate).toLocaleDateString()}
-                </Text>
-              </View>
+              {item.expiry_date && (
+                <View style={styles.cardFooter}>
+                  <Calendar size={16} color={colors.textMuted} />
+                  <Text style={styles.cardFooterText}>
+                    {t('storage.expires')}: {new Date(item.expiry_date).toLocaleDateString()}
+                  </Text>
+                </View>
+              )}
             </View>
           );
         }}
@@ -142,10 +326,34 @@ const createStyles = (colors: ThemeColors) =>
       color: colors.inputText,
       fontSize: 16,
     },
+    filterContainer: {
+      flexDirection: 'row',
+      gap: 8,
+      paddingHorizontal: 24,
+      paddingVertical: 16,
+      flexWrap: 'wrap',
+    },
+    filterButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      borderRadius: 20,
+      borderWidth: 1.5,
+      backgroundColor: colors.surface,
+    },
+    filterButtonActive: {
+      backgroundColor: colors.surface,
+    },
+    filterButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+    },
     list: {
       paddingBottom: 160,
     },
-    listHeader: { paddingBottom: 24 },
+    listHeader: { paddingBottom: 0 },
     separator: { height: 16 },
     card: {
       marginHorizontal: 24,
@@ -161,12 +369,18 @@ const createStyles = (colors: ThemeColors) =>
     cardHeader: {
       flexDirection: 'row',
       justifyContent: 'space-between',
-      alignItems: 'center',
+      alignItems: 'flex-start',
+      gap: 12,
     },
     cardTitleContainer: {
       flexDirection: 'row',
       gap: 12,
       alignItems: 'center',
+      flex: 1,
+    },
+    cardTextContainer: {
+      flex: 1,
+      gap: 2,
     },
     icon: {
       width: 44,
@@ -175,6 +389,7 @@ const createStyles = (colors: ThemeColors) =>
       backgroundColor: colors.primarySoft,
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
     },
     cardTitle: {
       fontSize: 16,
@@ -183,7 +398,13 @@ const createStyles = (colors: ThemeColors) =>
     },
     cardSubtitle: {
       color: colors.textSecondary,
-      marginTop: 4,
+      fontSize: 13,
+    },
+    cardSubtitleRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flexWrap: 'wrap',
+      marginTop: 2,
     },
     statusBadge: {
       borderWidth: 1,
@@ -191,9 +412,12 @@ const createStyles = (colors: ThemeColors) =>
       paddingHorizontal: 12,
       borderRadius: 999,
       borderColor: colors.border,
+      alignSelf: 'flex-start',
+      flexShrink: 0,
     },
     statusText: {
       fontWeight: '600',
+      fontSize: 12,
     },
     cardFooter: {
       flexDirection: 'row',
@@ -219,5 +443,31 @@ const createStyles = (colors: ThemeColors) =>
       shadowRadius: 8,
       shadowOffset: { width: 0, height: 6 },
       elevation: 5,
+    },
+    loadingState: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 12,
+      paddingHorizontal: 24,
+    },
+    loadingLabel: {
+      fontSize: 15,
+    },
+    emptyState: {
+      marginTop: 48,
+      marginHorizontal: 24,
+      backgroundColor: colors.surfaceMuted,
+      borderRadius: 20,
+      padding: 32,
+      alignItems: 'center',
+      gap: 12,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+    },
+    emptySubtitle: {
+      textAlign: 'center',
     },
   });

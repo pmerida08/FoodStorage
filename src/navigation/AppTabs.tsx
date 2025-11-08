@@ -8,12 +8,64 @@ import { StorageScreen } from '@/screens/StorageScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
 import { ChefHat, Heart, Home, Package, User } from 'lucide-react-native';
+import { useTranslation } from 'react-i18next';
+import { useEffect, useRef } from 'react';
+import { Animated } from 'react-native';
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
+
+type AnimatedTabLabelProps = {
+  focused: boolean;
+  label: string;
+  color: string;
+};
+
+const AnimatedTabLabel = ({ focused, label, color }: AnimatedTabLabelProps) => {
+  const opacity = useRef(new Animated.Value(focused ? 1 : 0)).current;
+  const scale = useRef(new Animated.Value(focused ? 1 : 0.5)).current;
+
+  useEffect(() => {
+    Animated.parallel([
+      Animated.timing(opacity, {
+        toValue: focused ? 1 : 0,
+        duration: 200,
+        useNativeDriver: true,
+      }),
+      Animated.spring(scale, {
+        toValue: focused ? 1 : 0.5,
+        friction: 8,
+        tension: 100,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [focused, opacity, scale]);
+
+  return (
+    <Animated.Text
+      style={{
+        fontSize: 12,
+        color,
+        opacity,
+        transform: [{ scale }],
+      }}
+    >
+      {label}
+    </Animated.Text>
+  );
+};
 
 export const AppTabs = () => {
   const { colors: navColors } = useTheme();
   const { colors } = useThemeMode();
+  const { t } = useTranslation();
+
+  const tabLabels = {
+    Home: t('navigation.home'),
+    Storage: t('navigation.storage'),
+    Recipes: t('navigation.recipes'),
+    Favorites: t('navigation.favorites'),
+    Profile: t('navigation.profile'),
+  };
 
   return (
     <Tab.Navigator
@@ -27,6 +79,7 @@ export const AppTabs = () => {
         } as const;
 
         const Icon = icons[route.name as keyof typeof icons];
+        const label = tabLabels[route.name as keyof typeof tabLabels];
 
         return {
           headerShown: false,
@@ -48,11 +101,11 @@ export const AppTabs = () => {
             shadowRadius: 12,
             elevation: 8,
           },
-          tabBarLabelStyle: {
-            fontSize: 12,
-          },
           tabBarIcon: ({ color, size }: { color: string; size: number }) => (
             <Icon color={color} size={size ?? 22} />
+          ),
+          tabBarLabel: ({ focused, color }: { focused: boolean; color: string }) => (
+            <AnimatedTabLabel focused={focused} label={label} color={color} />
           ),
         };
       }}

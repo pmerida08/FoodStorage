@@ -1,5 +1,6 @@
 import 'react-native-gesture-handler';
 import 'react-native-reanimated';
+import '@/lib/i18n/config';
 import { useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -8,6 +9,7 @@ import { RootNavigator } from '@/navigation/RootNavigator';
 import { AuthProvider } from '@/providers/AuthProvider';
 import { ToastProvider } from '@/providers/ToastProvider';
 import { ThemeProvider, useThemeMode } from '@/providers/ThemeProvider';
+import { LanguageProvider } from '@/providers/LanguageProvider';
 
 const ThemeStatusBar = () => {
   const { mode } = useThemeMode();
@@ -21,12 +23,14 @@ export const App = () => {
     <SafeAreaProvider>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <ThemeProvider>
-            <ToastProvider>
-              <ThemeStatusBar />
-              <RootNavigator />
-            </ToastProvider>
-          </ThemeProvider>
+          <LanguageProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                <ThemeStatusBar />
+                <RootNavigator />
+              </ToastProvider>
+            </ThemeProvider>
+          </LanguageProvider>
         </AuthProvider>
       </QueryClientProvider>
     </SafeAreaProvider>

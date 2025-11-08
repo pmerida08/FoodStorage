@@ -9,6 +9,7 @@ import {
 } from 'react';
 import type { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/lib/supabase/client';
+import { initializeStorageLocations, deduplicateStorageLocations } from '@/lib/supabase/storageService';
 
 type AuthContextValue = {
   user: User | null;
@@ -33,6 +34,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const { data } = await supabase.auth.getSession();
       setSession(data.session);
       setUser(data.session?.user ?? null);
+
+      // Initialize storage locations for the user
+      if (data.session?.user) {
+        try {
+          await initializeStorageLocations(data.session.user.id);
+          await deduplicateStorageLocations(data.session.user.id);
+        } catch (error) {
+          console.error('Failed to initialize storage locations:', error);
+        }
+      }
+
       setLoading(false);
     };
 
@@ -40,9 +52,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, newSession) => {
+    } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
       setSession(newSession);
       setUser(newSession?.user ?? null);
+
+      // Initialize storage locations for the user
+      if (newSession?.user) {
+        try {
+          await initializeStorageLocations(newSession.user.id);
+        } catch (error) {
+          console.error('Failed to initialize storage locations:', error);
+        }
+      }
+
       setLoading(false);
     });
 

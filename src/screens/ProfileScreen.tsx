@@ -4,8 +4,10 @@ import { useAuth } from '@/providers/AuthProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import { useToast } from '@/providers/ToastProvider';
+import { useLanguage } from '@/providers/LanguageProvider';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -27,6 +29,8 @@ export const ProfileScreen = () => {
   const { user, signOut } = useAuth();
   const { showToast } = useToast();
   const { colors, mode, toggleTheme } = useThemeMode();
+  const { language, setLanguage, loading: translationLoading } = useLanguage();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
@@ -90,12 +94,12 @@ export const ProfileScreen = () => {
     },
     onSuccess: (updatedProfile) => {
       queryClient.setQueryData<Profile | undefined>(profileQueryKey(user?.id), updatedProfile);
-      showToast({ title: 'Profile updated', message: 'Your name has been saved.', type: 'success' });
+      showToast({ title: t('profile.updateSuccess'), message: t('profile.updateSuccessMsg'), type: 'success' });
     },
     onError: (updateError: unknown) => {
       const message =
-        updateError instanceof Error ? updateError.message : 'Unable to update profile right now.';
-      showToast({ title: 'Update failed', message, type: 'error' });
+        updateError instanceof Error ? updateError.message : t('profile.updateErrorMsg');
+      showToast({ title: t('profile.updateError'), message, type: 'error' });
     },
   });
 
@@ -104,12 +108,12 @@ export const ProfileScreen = () => {
       await signOut();
     },
     onSuccess: () => {
-      showToast({ title: 'Signed out', message: 'You have been logged out safely.', type: 'success' });
+      showToast({ title: t('profile.signOutSuccess'), message: t('profile.signOutSuccessMsg'), type: 'success' });
     },
     onError: (signOutError: unknown) => {
       const message =
-        signOutError instanceof Error ? signOutError.message : 'Unable to sign out right now.';
-      showToast({ title: 'Sign out failed', message, type: 'error' });
+        signOutError instanceof Error ? signOutError.message : t('profile.signOutErrorMsg');
+      showToast({ title: t('profile.signOutError'), message, type: 'error' });
     },
   });
 
@@ -135,15 +139,15 @@ export const ProfileScreen = () => {
       }
     },
     onSuccess: () => {
-      showToast({ title: 'Password updated', message: 'Your password has been changed.', type: 'success' });
+      showToast({ title: t('profile.passwordUpdateSuccess'), message: t('profile.passwordUpdateSuccessMsg'), type: 'success' });
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');
     },
     onError: (updateError: unknown) => {
       const message =
-        updateError instanceof Error ? updateError.message : 'Unable to update password right now.';
-      showToast({ title: 'Update failed', message, type: 'error' });
+        updateError instanceof Error ? updateError.message : t('profile.passwordUpdateErrorMsg');
+      showToast({ title: t('profile.passwordUpdateError'), message, type: 'error' });
     },
   });
 
@@ -183,7 +187,7 @@ export const ProfileScreen = () => {
         <View style={styles.loadingState}>
           <ActivityIndicator color={colors.primary} size="large" />
           <Text style={[styles.loadingLabel, { color: colors.textSecondary }]}>
-            Loading your profile...
+            {t('profile.loading')}
           </Text>
         </View>
       </SafeAreaView>
@@ -195,16 +199,16 @@ export const ProfileScreen = () => {
       <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
         <View style={styles.errorState}>
           <Text style={[styles.errorTitle, { color: colors.danger }]}>
-            We could not load your profile.
+            {t('profile.loadError')}
           </Text>
           <Text style={[styles.errorMessage, { color: colors.textSecondary }]}>
-            {error instanceof Error ? error.message : 'Please try again.'}
+            {error instanceof Error ? error.message : t('profile.tryAgain')}
           </Text>
           <TouchableOpacity
             style={[styles.retryButton, { backgroundColor: colors.primary }]}
             onPress={() => refetch()}
           >
-            <Text style={styles.retryLabel}>Try again</Text>
+            <Text style={styles.retryLabel}>{t('profile.tryAgain')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -227,9 +231,9 @@ export const ProfileScreen = () => {
         showsVerticalScrollIndicator={false}
       >
         <View style={[styles.header, { backgroundColor: colors.primary }]}>
-          <Text style={[styles.title, { color: colors.primaryContrast }]}>Profile</Text>
+          <Text style={[styles.title, { color: colors.primaryContrast }]}>{t('profile.title')}</Text>
           <Text style={[styles.subtitle, { color: colors.primaryContrast }]}>
-            Update your personal information and app settings.
+            {t('profile.subtitle')}
           </Text>
         </View>
 
@@ -245,10 +249,10 @@ export const ProfileScreen = () => {
           ]}
         >
           <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>
-            Personal information
+            {t('profile.personalInfo')}
           </Text>
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textPrimary }]}>Full name</Text>
+            <Text style={[styles.label, { color: colors.textPrimary }]}>{t('profile.fullName')}</Text>
             <TextInput
               value={fullName}
               onChangeText={setFullName}
@@ -268,7 +272,7 @@ export const ProfileScreen = () => {
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textPrimary }]}>Email address</Text>
+            <Text style={[styles.label, { color: colors.textPrimary }]}>{t('profile.emailAddress')}</Text>
             <View
               style={[
                 styles.readOnlyField,
@@ -296,7 +300,7 @@ export const ProfileScreen = () => {
             disabled={!canSaveProfile}
           >
             <Text style={[styles.primaryButtonLabel, { color: colors.textInverse }]}>
-              {updateProfileMutation.isPending ? 'Saving...' : 'Save changes'}
+              {updateProfileMutation.isPending ? t('profile.saving') : t('profile.saveChanges')}
             </Text>
           </TouchableOpacity>
 
@@ -312,7 +316,7 @@ export const ProfileScreen = () => {
             disabled={logoutMutation.isPending}
           >
             <Text style={[styles.dangerButtonLabel, { color: colors.textInverse }]}>
-              {logoutMutation.isPending ? 'Signing out...' : 'Log out'}
+              {logoutMutation.isPending ? t('profile.signingOut') : t('profile.logOut')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -327,12 +331,12 @@ export const ProfileScreen = () => {
             },
           ]}
         >
-          <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>Settings</Text>
+          <Text style={[styles.sectionHeading, { color: colors.textPrimary }]}>{t('profile.settings')}</Text>
           <View style={styles.settingRow}>
             <View style={styles.settingCopy}>
-              <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>Dark mode</Text>
+              <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('profile.darkMode')}</Text>
               <Text style={[styles.settingSubtitle, { color: colors.textMuted }]}>
-                Switch between light and dark themes.
+                {t('profile.darkModeDesc')}
               </Text>
             </View>
             <Switch
@@ -346,13 +350,68 @@ export const ProfileScreen = () => {
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
-          <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>Change password</Text>
+          <View style={styles.settingRow}>
+            <View style={styles.settingCopy}>
+              <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('profile.language')}</Text>
+              <Text style={[styles.settingSubtitle, { color: colors.textMuted }]}>
+                {t('profile.languageDesc')}
+              </Text>
+            </View>
+            {translationLoading ? (
+              <ActivityIndicator size="small" color={colors.primary} />
+            ) : (
+              <View style={styles.languageButtons}>
+                <TouchableOpacity
+                  style={[
+                    styles.languageButton,
+                    {
+                      backgroundColor: language === 'en' ? colors.primary : colors.surfaceMuted,
+                      borderColor: language === 'en' ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => setLanguage('en')}
+                >
+                  <Text
+                    style={[
+                      styles.languageButtonText,
+                      { color: language === 'en' ? colors.primaryContrast : colors.textSecondary },
+                    ]}
+                  >
+                    EN
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[
+                    styles.languageButton,
+                    {
+                      backgroundColor: language === 'es' ? colors.primary : colors.surfaceMuted,
+                      borderColor: language === 'es' ? colors.primary : colors.border,
+                    },
+                  ]}
+                  onPress={() => setLanguage('es')}
+                >
+                  <Text
+                    style={[
+                      styles.languageButtonText,
+                      { color: language === 'es' ? colors.primaryContrast : colors.textSecondary },
+                    ]}
+                  >
+                    ES
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            )}
+          </View>
+
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+          <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('profile.changePassword')}</Text>
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textPrimary }]}>Current password</Text>
+            <Text style={[styles.label, { color: colors.textPrimary }]}>{t('profile.currentPassword')}</Text>
             <TextInput
               value={currentPassword}
               onChangeText={setCurrentPassword}
-              placeholder="Enter current password"
+              placeholder={t('profile.enterCurrentPassword')}
               placeholderTextColor={colors.inputPlaceholder}
               style={[
                 styles.input,
@@ -368,11 +427,11 @@ export const ProfileScreen = () => {
           </View>
 
           <View style={styles.field}>
-            <Text style={[styles.label, { color: colors.textPrimary }]}>New password</Text>
+            <Text style={[styles.label, { color: colors.textPrimary }]}>{t('profile.newPassword')}</Text>
             <TextInput
               value={newPassword}
               onChangeText={setNewPassword}
-              placeholder="Enter new password"
+              placeholder={t('profile.enterNewPassword')}
               placeholderTextColor={colors.inputPlaceholder}
               style={[
                 styles.input,
@@ -389,12 +448,12 @@ export const ProfileScreen = () => {
 
           <View style={styles.field}>
             <Text style={[styles.label, { color: colors.textPrimary }]}>
-              Confirm new password
+              {t('profile.confirmPassword')}
             </Text>
             <TextInput
               value={confirmPassword}
               onChangeText={setConfirmPassword}
-              placeholder="Re-enter new password"
+              placeholder={t('profile.reenterPassword')}
               placeholderTextColor={colors.inputPlaceholder}
               style={[
                 styles.input,
@@ -411,12 +470,12 @@ export const ProfileScreen = () => {
 
           {!passwordsMatch && confirmPassword.length > 0 && (
             <Text style={[styles.helperText, { color: colors.danger }]}>
-              Passwords do not match.
+              {t('profile.passwordsNoMatch')}
             </Text>
           )}
           {!passwordLengthOk && newPassword.length > 0 && (
             <Text style={[styles.helperText, { color: colors.textMuted }]}>
-              Password should be at least 6 characters long.
+              {t('profile.passwordLength')}
             </Text>
           )}
 
@@ -432,14 +491,14 @@ export const ProfileScreen = () => {
             disabled={!canChangePassword}
           >
             <Text style={[styles.primaryButtonLabel, { color: colors.primaryContrast }]}>
-              {changePasswordMutation.isPending ? 'Updating...' : 'Change password'}
+              {changePasswordMutation.isPending ? t('profile.updating') : t('profile.changePassword')}
             </Text>
           </TouchableOpacity>
         </View>
 
         {profile?.updated_at && (
           <Text style={[styles.updatedAt, { color: colors.textMuted }]}>
-            Last updated {new Date(profile.updated_at).toLocaleString()}
+            {t('profile.lastUpdated')} {new Date(profile.updated_at).toLocaleString()}
           </Text>
         )}
       </ScrollView>
@@ -546,6 +605,22 @@ const createStyles = (colors: ThemeColors) =>
     },
     settingSubtitle: {
       fontSize: 14,
+    },
+    languageButtons: {
+      flexDirection: 'row',
+      gap: 8,
+    },
+    languageButton: {
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      borderRadius: 8,
+      borderWidth: 1,
+      minWidth: 50,
+      alignItems: 'center',
+    },
+    languageButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
     },
     divider: {
       height: StyleSheet.hairlineWidth,
