@@ -3,16 +3,19 @@ import type { ThemeColors } from '@/providers/ThemeProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Calendar, Package2, Plus, Search, Snowflake, Refrigerator, Package } from 'lucide-react-native';
-import { useMemo, useState, useEffect } from 'react';
+import { Calendar, Package2, Plus, Search, Snowflake, Refrigerator, Package, Trash2 } from 'lucide-react-native';
+import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/providers/AuthProvider';
-import { useQuery } from '@tanstack/react-query';
-import { getStorageItems, getItemStatus } from '@/lib/supabase/storageService';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { deleteStorageItem, getStorageItems, getItemStatus } from '@/lib/supabase/storageService';
 import { useLanguage } from '@/providers/LanguageProvider';
 import { translateText } from '@/lib/i18n/contentTranslation';
+import { useToast } from '@/providers/ToastProvider';
 import {
   ActivityIndicator,
+  Alert,
+  Animated,
   FlatList,
   RefreshControl,
   StyleSheet,
@@ -21,6 +24,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import { GestureHandlerRootView, Swipeable } from 'react-native-gesture-handler';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
@@ -40,6 +44,10 @@ export const StorageScreen = () => {
   const { user } = useAuth();
   const { language } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
+  const { showToast } = useToast();
+  const queryClient = useQueryClient();
+  const swipeableRefs = useRef<Record<string, Swipeable | null>>({});
+  const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
 
   const locationConfig = useMemo(
     () => ({
@@ -94,6 +102,39 @@ export const StorageScreen = () => {
     }
   }, [items, language]);
 
+  const deleteItemMutation = useMutation({
+    mutationFn: async ({ id }: { id: string; name: string }) => {
+      await deleteStorageItem(id);
+    },
+    onMutate: (variables) => {
+      setDeletingItemId(variables.id);
+    },
+    onSuccess: (_result, variables) => {
+      void queryClient.invalidateQueries({ queryKey: ['storage-items', user?.id] });
+      showToast({
+        title: t('storage.deleteSuccessTitle', { defaultValue: 'Item removed' }),
+        message: t('storage.deleteSuccessMsg', {
+          defaultValue: `${variables.name} was removed from your storage.`,
+          name: variables.name,
+        }),
+      });
+    },
+    onError: (error) => {
+      const message =
+        error instanceof Error
+          ? error.message
+          : t('storage.deleteErrorMessage', { defaultValue: 'Please try again later.' });
+      showToast({
+        title: t('storage.deleteErrorTitle', { defaultValue: 'Could not delete item' }),
+        message,
+        type: 'error',
+      });
+    },
+    onSettled: () => {
+      setDeletingItemId(null);
+    },
+  });
+
   const statusConfig = useMemo(
     () => ({
       fresh: { label: t('storage.fresh'), backgroundColor: colors.successSoft, color: colors.success },
@@ -101,6 +142,74 @@ export const StorageScreen = () => {
       expired: { label: t('storage.expired'), backgroundColor: colors.dangerSoft, color: colors.danger },
     }),
     [colors.danger, colors.dangerSoft, colors.success, colors.successSoft, colors.warning, colors.warningSoft, t],
+  );
+
+  const handleDeleteItem = useCallback(
+    (item: TranslatedItem) => {
+      Alert.alert(
+        t('storage.deleteTitle', { defaultValue: 'Remove item?' }),
+        t('storage.deleteMessage', {
+          defaultValue: 'This will remove {{name}} from your storage.',
+          name: item.translatedName,
+        }),
+        [
+          {
+            text: t('common.cancel', { defaultValue: 'Cancel' }),
+            style: 'cancel',
+            onPress: () => {
+              swipeableRefs.current[item.id]?.close();
+            },
+          },
+          {
+            text: t('common.delete', { defaultValue: 'Delete' }),
+            style: 'destructive',
+            onPress: () => {
+              swipeableRefs.current[item.id]?.close();
+              deleteItemMutation.mutate({ id: item.id, name: item.translatedName });
+            },
+          },
+        ],
+      );
+    },
+    [deleteItemMutation, t],
+  );
+
+  const renderSwipeActions = useCallback(
+    (
+      item: TranslatedItem,
+      progress: Animated.AnimatedInterpolation<number>,
+      _dragX: Animated.AnimatedInterpolation<number>,
+    ) => {
+      const translateX = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [64, 0],
+      });
+      const opacity = progress.interpolate({
+        inputRange: [0, 1],
+        outputRange: [0, 1],
+      });
+
+      const deletingThisItem = deletingItemId === item.id && deleteItemMutation.isPending;
+
+      return (
+        <Animated.View style={[styles.deleteActionContainer, { opacity, transform: [{ translateX }] }]}>
+          <TouchableOpacity
+            style={styles.deleteActionButton}
+            onPress={() => handleDeleteItem(item)}
+            disabled={deleteItemMutation.isPending}
+            accessibilityLabel={t('storage.deleteActionLabel', { defaultValue: 'Delete item' })}
+          >
+            {deletingThisItem ? (
+              <ActivityIndicator color={colors.surface} />
+            ) : (
+              <Trash2 size={20} color={colors.surface} />
+            )}
+            <Text style={styles.deleteActionText}>{t('common.delete', { defaultValue: 'Delete' })}</Text>
+          </TouchableOpacity>
+        </Animated.View>
+      );
+    },
+    [colors.surface, deleteItemMutation.isPending, deletingItemId, handleDeleteItem, styles, t],
   );
 
   const filtered = useMemo(() => {
@@ -125,19 +234,22 @@ export const StorageScreen = () => {
 
   if (isLoading && !items.length) {
     return (
-      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
-        <View style={styles.loadingState}>
-          <ActivityIndicator color={colors.primary} size="large" />
-          <Text style={[styles.loadingLabel, { color: colors.textSecondary }]}>
-            {t('storage.title')}...
-          </Text>
-        </View>
-      </SafeAreaView>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+          <View style={styles.loadingState}>
+            <ActivityIndicator color={colors.primary} size="large" />
+            <Text style={[styles.loadingLabel, { color: colors.textSecondary }]}>
+              {t('storage.title')}...
+            </Text>
+          </View>
+        </SafeAreaView>
+      </GestureHandlerRootView>
     );
   }
 
   return (
-    <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
@@ -237,50 +349,64 @@ export const StorageScreen = () => {
           const LocationIcon = locationInfo?.icon || Package2;
 
           return (
-            <View style={styles.card}>
-              <View style={styles.cardHeader}>
-                <View style={styles.cardTitleContainer}>
-                  <View
-                    style={[
-                      styles.icon,
-                      {
-                        backgroundColor: locationInfo?.backgroundColor || colors.primarySoft,
-                      },
-                    ]}
-                  >
-                    <LocationIcon size={20} color={locationInfo?.color || colors.primary} />
-                  </View>
-                  <View style={styles.cardTextContainer}>
-                    <Text style={styles.cardTitle}>{item.translatedName}</Text>
-                    <View style={styles.cardSubtitleRow}>
-                      {displayQuantity ? <Text style={styles.cardSubtitle}>{displayQuantity}</Text> : null}
-                      {displayQuantity && locationInfo && <Text style={styles.cardSubtitle}> • </Text>}
-                      {locationInfo && (
-                        <Text style={[styles.cardSubtitle, { color: locationInfo.color }]}>
-                          {locationInfo.name}
-                        </Text>
-                      )}
+            <Swipeable
+              ref={(ref) => {
+                if (ref) {
+                  swipeableRefs.current[item.id] = ref;
+                } else {
+                  delete swipeableRefs.current[item.id];
+                }
+              }}
+              renderRightActions={(progress, dragX) => renderSwipeActions(item, progress, dragX)}
+              friction={2}
+              rightThreshold={40}
+              overshootRight={false}
+            >
+              <View style={styles.card}>
+                <View style={styles.cardHeader}>
+                  <View style={styles.cardTitleContainer}>
+                    <View
+                      style={[
+                        styles.icon,
+                        {
+                          backgroundColor: locationInfo?.backgroundColor || colors.primarySoft,
+                        },
+                      ]}
+                    >
+                      <LocationIcon size={20} color={locationInfo?.color || colors.primary} />
+                    </View>
+                    <View style={styles.cardTextContainer}>
+                      <Text style={styles.cardTitle}>{item.translatedName}</Text>
+                      <View style={styles.cardSubtitleRow}>
+                        {displayQuantity ? <Text style={styles.cardSubtitle}>{displayQuantity}</Text> : null}
+                        {displayQuantity && locationInfo && <Text style={styles.cardSubtitle}> • </Text>}
+                        {locationInfo && (
+                          <Text style={[styles.cardSubtitle, { color: locationInfo.color }]}>
+                            {locationInfo.name}
+                          </Text>
+                        )}
+                      </View>
                     </View>
                   </View>
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      { backgroundColor: status.backgroundColor, borderColor: status.color },
+                    ]}
+                  >
+                    <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
+                  </View>
                 </View>
-                <View
-                  style={[
-                    styles.statusBadge,
-                    { backgroundColor: status.backgroundColor, borderColor: status.color },
-                  ]}
-                >
-                  <Text style={[styles.statusText, { color: status.color }]}>{status.label}</Text>
-                </View>
+                {item.expiry_date && (
+                  <View style={styles.cardFooter}>
+                    <Calendar size={16} color={colors.textMuted} />
+                    <Text style={styles.cardFooterText}>
+                      {t('storage.expires')}: {new Date(item.expiry_date).toLocaleDateString()}
+                    </Text>
+                  </View>
+                )}
               </View>
-              {item.expiry_date && (
-                <View style={styles.cardFooter}>
-                  <Calendar size={16} color={colors.textMuted} />
-                  <Text style={styles.cardFooterText}>
-                    {t('storage.expires')}: {new Date(item.expiry_date).toLocaleDateString()}
-                  </Text>
-                </View>
-              )}
-            </View>
+            </Swipeable>
           );
         }}
       />
@@ -289,6 +415,7 @@ export const StorageScreen = () => {
         <Plus size={24} color={colors.fabIcon} />
       </TouchableOpacity>
     </SafeAreaView>
+    </GestureHandlerRootView>
   );
 };
 
@@ -469,5 +596,26 @@ const createStyles = (colors: ThemeColors) =>
     },
     emptySubtitle: {
       textAlign: 'center',
+    },
+    deleteActionContainer: {
+      justifyContent: 'center',
+      alignItems: 'flex-end',
+      marginVertical: 8,
+      marginRight: 12,
+    },
+    deleteActionButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: colors.danger,
+      borderRadius: 16,
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      minWidth: 120,
+      justifyContent: 'center',
+    },
+    deleteActionText: {
+      color: colors.surface,
+      fontWeight: '700',
     },
   });

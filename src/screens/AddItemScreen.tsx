@@ -15,6 +15,7 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Camera, Check, Edit3, Trash2 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
 import DateTimePicker, {
   DateTimePickerAndroid,
   type DateTimePickerEvent,
@@ -48,6 +49,82 @@ type BatchItem = {
   selected: boolean;
 };
 
+type NormalizedReceiptAsset = {
+  uri: string;
+  displayName: string;
+};
+
+const HEIC_EXTENSIONS = new Set(['heic', 'heif']);
+const DEFAULT_RECEIPT_NAME = 'receipt.jpg';
+
+const getAssetFileName = (asset: ImagePicker.ImagePickerAsset): string => {
+  const fromPicker = asset.fileName?.trim();
+  if (fromPicker) {
+    return fromPicker;
+  }
+  const sanitizedUri = asset.uri.split('?')[0];
+  const uriSegment = sanitizedUri.split('/').pop();
+  return uriSegment?.trim() || DEFAULT_RECEIPT_NAME;
+};
+
+const getFileExtension = (fileName: string): string | null => {
+  const segments = fileName.toLowerCase().split('.');
+  if (segments.length < 2) {
+    return null;
+  }
+  return segments.pop() || null;
+};
+
+const isHeicMimeType = (mime?: string | null): boolean => {
+  if (!mime) {
+    return false;
+  }
+  const normalized = mime.toLowerCase();
+  return normalized === 'image/heic' || normalized === 'image/heif';
+};
+
+const shouldConvertHeicAsset = (asset: ImagePicker.ImagePickerAsset): boolean => {
+  const fileName = getAssetFileName(asset);
+  const extension = getFileExtension(fileName);
+  if (extension && HEIC_EXTENSIONS.has(extension)) {
+    return true;
+  }
+  return isHeicMimeType(asset.mimeType);
+};
+
+const normalizeReceiptAsset = async (asset: ImagePicker.ImagePickerAsset): Promise<NormalizedReceiptAsset> => {
+  const fallbackName = getAssetFileName(asset);
+  if (!shouldConvertHeicAsset(asset)) {
+    return {
+      uri: asset.uri,
+      displayName: fallbackName,
+    };
+  }
+
+  try {
+    const converted = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      [],
+      {
+        compress: 0.9,
+        format: ImageManipulator.SaveFormat.JPEG,
+      },
+    );
+    const sanitizedBase = fallbackName.replace(/\.(heic|heif)$/i, '');
+    const displayName = `${sanitizedBase || 'receipt'}.jpg`;
+    return {
+      uri: converted.uri,
+      displayName,
+    };
+  } catch (error) {
+    console.warn('Failed to convert HEIC receipt image, using original file', error);
+    return {
+      uri: asset.uri,
+      displayName: fallbackName,
+    };
+  }
+};
+
 export const AddItemScreen = () => {
   const navigation = useNavigation<Navigation>();
   const { showToast } = useToast();
@@ -68,6 +145,7 @@ export const AddItemScreen = () => {
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
+  const [receiptDisplayName, setReceiptDisplayName] = useState('');
   const [expiryDate, setExpiryDate] = useState<Date | null>(null);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
 
@@ -78,6 +156,15 @@ export const AddItemScreen = () => {
   });
 
   const [translatedLocations, setTranslatedLocations] = useState<TranslatedLocation[]>([]);
+  const updateReceiptAttachment = useCallback((attachment: NormalizedReceiptAsset | null) => {
+    if (!attachment) {
+      setReceiptImageUri(null);
+      setReceiptDisplayName('');
+      return;
+    }
+    setReceiptImageUri(attachment.uri);
+    setReceiptDisplayName(attachment.displayName);
+  }, []);
   const translateNameToEnglish = useCallback(
     async (value: string) => {
       const trimmed = value.trim();
@@ -193,7 +280,7 @@ export const AddItemScreen = () => {
       });
       setBatchItems([]);
       setEditingItemId(null);
-      setReceiptImageUri(null);
+      updateReceiptAttachment(null);
       navigation.goBack();
     },
     onError: (error: unknown) => {
@@ -304,7 +391,8 @@ export const AddItemScreen = () => {
         throw new Error('Unable to read the selected photo.');
       }
 
-      setReceiptImageUri(asset.uri);
+      const normalizedAsset = await normalizeReceiptAsset(asset);
+      updateReceiptAttachment(normalizedAsset);
       setBatchItems([]);
       setEditingItemId(null);
       showToast({
@@ -389,7 +477,7 @@ export const AddItemScreen = () => {
         return;
       }
 
-      const parsedItems = parseReceiptLines(lines);
+      const parsedItems = await parseReceiptLines(lines);
       if (!parsedItems.length) {
         showToast({
           title: t('addItem.ocrNoItemsTitle', { defaultValue: 'No products found' }),
@@ -480,7 +568,7 @@ export const AddItemScreen = () => {
 
   const manualModeActive = mode === 'manual';
   const receiptReady = Boolean(receiptImageUri);
-  const receiptFileName = receiptImageUri?.split('/').pop() ?? '';
+  const receiptFileName = receiptDisplayName || receiptImageUri?.split('/').pop() ?? '';
   const selectedBatchItems = batchItems.filter((item) => item.selected);
   const missingLocationCount = selectedBatchItems.filter((item) => !item.storageLocationId).length;
   const canSubmitBatch = selectedBatchItems.length > 0 && missingLocationCount === 0;

@@ -91,6 +91,18 @@ npm run web         # run in the browser
 
 ---
 
+## Receipt OCR Setup
+
+1. Create an OpenAI API key with GPT-4 Vision access (the project uses `gpt-4o-mini` by default).
+2. Add `EXPO_PUBLIC_OCR_API_KEY` to your `.env` file (you can reuse the translation key if you like).
+3. Restart Expo so the updated config propagates to the client bundle.
+
+When configured, the Add Item screen sends receipt photos to OpenAI GPT-4 Vision and parses the returned lines into structured pantry items.
+
+Receipts captured in HEIC/HEIF format (the default on many iOS devices) are automatically converted to JPEG before OCR, so you can keep your preferred camera settings without running into unsupported image errors.
+
+---
+
 ## 🤝 Contributing
 
 1. Fork & create a feature branch.

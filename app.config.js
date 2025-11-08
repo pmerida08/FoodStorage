@@ -31,6 +31,7 @@ module.exports = {
     plugins: ['expo-secure-store'],
     extra: {
       translationApiKey: process.env.EXPO_PUBLIC_TRANSLATION_API_KEY,
+      ocrApiKey: process.env.EXPO_PUBLIC_OCR_API_KEY || process.env.EXPO_PUBLIC_TRANSLATION_API_KEY,
       eas: {
         projectId: '14ee0f97-ef2c-460f-b5d3-7c8f060891b8',
       },
