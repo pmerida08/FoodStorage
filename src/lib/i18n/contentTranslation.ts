@@ -11,6 +11,10 @@ type TranslationCache = {
   };
 };
 
+type TranslateOptions = {
+  force?: boolean;
+};
+
 /**
  * Get cached content translations
  */
@@ -38,10 +42,17 @@ async function cacheContentTranslations(cache: TranslationCache): Promise<void> 
 /**
  * Translate a single text string using OpenAI
  */
+const LANGUAGE_LABELS: Record<string, string> = {
+  en: 'English',
+  es: 'Spanish',
+};
+
 async function translateTextWithAPI(text: string, targetLanguage: string): Promise<string> {
   if (!API_KEY) {
     return text; // Return original if no API key
   }
+
+  const targetLabel = LANGUAGE_LABELS[targetLanguage] ?? targetLanguage;
 
   const response = await fetch(OPENAI_API_URL, {
     method: 'POST',
@@ -54,7 +65,7 @@ async function translateTextWithAPI(text: string, targetLanguage: string): Promi
       messages: [
         {
           role: 'system',
-          content: `You are a professional translator. Translate the following text to ${targetLanguage}. Only return the translated text, nothing else.`,
+          content: `You are a professional translator. Translate the following text to ${targetLabel}. Only return the translated text, nothing else.`,
         },
         {
           role: 'user',
@@ -80,9 +91,11 @@ async function translateTextWithAPI(text: string, targetLanguage: string): Promi
 export async function translateText(
   text: string,
   targetLanguage: string,
+  options: TranslateOptions = {},
 ): Promise<string> {
+  const { force = false } = options;
   // Don't translate if target is English or text is empty
-  if (targetLanguage === 'en' || !text.trim()) {
+  if (!force && (targetLanguage === 'en' || !text.trim())) {
     return text;
   }
 

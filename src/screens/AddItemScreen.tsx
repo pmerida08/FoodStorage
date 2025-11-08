@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react';
+import { useMemo, useState, useEffect, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,10 @@ import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Camera, Check, Edit3, Trash2 } from 'lucide-react-native';
 import * as ImagePicker from 'expo-image-picker';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
 import type { RootStackParamList } from '@/navigation/types';
 import { useToast } from '@/providers/ToastProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
@@ -59,12 +63,13 @@ export const AddItemScreen = () => {
     quantity: '',
     unit: '',
     storageLocationId: '',
-    expiryDate: '',
   });
   const [batchItems, setBatchItems] = useState<BatchItem[]>([]);
   const [editingItemId, setEditingItemId] = useState<string | null>(null);
   const [isProcessingReceipt, setIsProcessingReceipt] = useState(false);
   const [receiptImageUri, setReceiptImageUri] = useState<string | null>(null);
+  const [expiryDate, setExpiryDate] = useState<Date | null>(null);
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
 
   const { data: locations = [] } = useQuery({
     queryKey: ['storage-locations', user?.id],
@@ -73,6 +78,38 @@ export const AddItemScreen = () => {
   });
 
   const [translatedLocations, setTranslatedLocations] = useState<TranslatedLocation[]>([]);
+  const translateNameToEnglish = useCallback(
+    async (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) {
+        return trimmed;
+      }
+      if (language === 'en') {
+        return trimmed;
+      }
+      return translateText(trimmed, 'en', { force: true });
+    },
+    [language],
+  );
+  const normalizedToday = useMemo(() => {
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    return now;
+  }, []);
+  const expiryDateDisplay = useMemo(() => {
+    if (!expiryDate) {
+      return t('addItem.expiryPlaceholder');
+    }
+    try {
+      return new Intl.DateTimeFormat(language, {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      }).format(expiryDate);
+    } catch {
+      return expiryDate.toLocaleDateString();
+    }
+  }, [expiryDate, language, t]);
 
   useEffect(() => {
     if (!locations.length) {
@@ -96,17 +133,19 @@ export const AddItemScreen = () => {
   const defaultLocationId = useMemo(() => translatedLocations[0]?.id ?? '', [translatedLocations]);
 
   const addItemMutation = useMutation({
-    mutationFn: () =>
-      createStorageItem(
+    mutationFn: async () => {
+      const englishName = await translateNameToEnglish(form.name);
+      return createStorageItem(
         {
-          name: form.name,
+          name: englishName,
           quantity: form.quantity || null,
           unit: form.unit || null,
           storage_location_id: form.storageLocationId,
-          expiry_date: form.expiryDate || null,
+          expiry_date: expiryDate ? expiryDate.toISOString().split('T')[0] : null,
         },
         user!.id,
-      ),
+      );
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['storage-items'] });
       const location = translatedLocations.find((loc) => loc.id === form.storageLocationId);
@@ -128,18 +167,19 @@ export const AddItemScreen = () => {
   const batchAddMutation = useMutation({
     mutationFn: async (items: BatchItem[]) => {
       await Promise.all(
-        items.map((item) =>
-          createStorageItem(
+        items.map(async (item) => {
+          const englishName = await translateNameToEnglish(item.name);
+          return createStorageItem(
             {
-              name: item.name,
+              name: englishName,
               quantity: item.quantity || null,
               unit: item.unit || null,
               storage_location_id: item.storageLocationId,
               expiry_date: null,
             },
             user!.id,
-          ),
-        ),
+          );
+        }),
       );
     },
     onSuccess: (_, addedItems) => {
@@ -168,6 +208,48 @@ export const AddItemScreen = () => {
 
   const setField = (key: keyof typeof form, value: string) => {
     setForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleDateValidationError = () => {
+    showToast({
+      title: t('addItem.expiryInvalidTitle', { defaultValue: 'Choose a valid date' }),
+      message: t('addItem.expiryInvalidMsg', { defaultValue: 'Expiry must be today or later.' }),
+      type: 'error',
+    });
+  };
+
+  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    if (event.type === 'dismissed') {
+      if (Platform.OS === 'ios') {
+        setIsDatePickerVisible(false);
+      }
+      return;
+    }
+
+    if (!selectedDate) {
+      return;
+    }
+
+    const normalizedSelection = new Date(selectedDate);
+    normalizedSelection.setHours(0, 0, 0, 0);
+    if (normalizedSelection < normalizedToday) {
+      handleDateValidationError();
+      return;
+    }
+    setExpiryDate(normalizedSelection);
+  };
+
+  const openDatePicker = () => {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: expiryDate ?? normalizedToday,
+        mode: 'date',
+        minimumDate: normalizedToday,
+        onChange: handleDateChange,
+      });
+      return;
+    }
+    setIsDatePickerVisible(true);
   };
 
   const handleSubmit = () => {
@@ -474,13 +556,31 @@ export const AddItemScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.label}>{t('addItem.expiryDate')}</Text>
-        <TextInput
-          style={styles.input}
-          placeholder={t('addItem.expiryPlaceholder')}
-          placeholderTextColor={colors.inputPlaceholder}
-          value={form.expiryDate}
-          onChangeText={(value) => setField('expiryDate', value)}
-        />
+        <TouchableOpacity style={styles.dateInput} onPress={openDatePicker}>
+          <Text
+            style={[
+              styles.dateInputText,
+              !expiryDate && { color: colors.inputPlaceholder },
+            ]}
+          >
+            {expiryDateDisplay}
+          </Text>
+        </TouchableOpacity>
+        {Platform.OS === 'ios' && isDatePickerVisible && (
+          <View style={styles.iosDatePicker}>
+            <DateTimePicker
+              value={expiryDate ?? normalizedToday}
+              mode="date"
+              display="spinner"
+              minimumDate={normalizedToday}
+              onChange={handleDateChange}
+              style={styles.iosPicker}
+            />
+            <TouchableOpacity style={styles.iosPickerDone} onPress={() => setIsDatePickerVisible(false)}>
+              <Text style={styles.iosPickerDoneText}>{t('common.done')}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       <TouchableOpacity
@@ -811,6 +911,40 @@ const createStyles = (colors: ThemeColors) =>
       paddingVertical: 14,
       fontSize: 16,
       color: colors.inputText,
+    },
+    dateInput: {
+      borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.inputBorder,
+      backgroundColor: colors.inputBackground,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+      justifyContent: 'center',
+    },
+    dateInputText: {
+      fontSize: 16,
+      color: colors.inputText,
+    },
+    iosDatePicker: {
+      marginTop: 12,
+      borderRadius: 16,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surface,
+      overflow: 'hidden',
+    },
+    iosPicker: {
+      width: '100%',
+    },
+    iosPickerDone: {
+      paddingVertical: 12,
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    iosPickerDoneText: {
+      color: colors.primary,
+      fontWeight: '600',
     },
     locationButtons: {
       flexDirection: 'row',
