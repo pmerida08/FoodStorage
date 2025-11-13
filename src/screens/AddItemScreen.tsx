@@ -568,7 +568,7 @@ export const AddItemScreen = () => {
 
   const manualModeActive = mode === 'manual';
   const receiptReady = Boolean(receiptImageUri);
-  const receiptFileName = receiptDisplayName || receiptImageUri?.split('/').pop() ?? '';
+  const receiptFileName = receiptDisplayName || (receiptImageUri?.split('/').pop() ?? '');
   const selectedBatchItems = batchItems.filter((item) => item.selected);
   const missingLocationCount = selectedBatchItems.filter((item) => !item.storageLocationId).length;
   const canSubmitBatch = selectedBatchItems.length > 0 && missingLocationCount === 0;
