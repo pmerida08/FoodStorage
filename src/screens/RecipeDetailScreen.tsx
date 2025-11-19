@@ -1,12 +1,10 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { RouteProp, useRoute } from '@react-navigation/native';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { RootStackParamList } from '@/navigation/types';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
-import { useTranslation } from 'react-i18next';
-import { useLanguage } from '@/providers/LanguageProvider';
-import { translateRecipe } from '@/lib/i18n/contentTranslation';
+import { useTranslation } from '@/lib/i18n';
 
 type Route = RouteProp<RootStackParamList, 'RecipeDetail'>;
 
@@ -51,39 +49,8 @@ export const RecipeDetailScreen = () => {
   const originalRecipe = recipeDetails[recipeKey] ?? recipeDetails['1'];
   const { colors } = useThemeMode();
   const { t } = useTranslation();
-  const { language } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  const [translatedRecipe, setTranslatedRecipe] = useState(originalRecipe);
-  const [isTranslating, setIsTranslating] = useState(false);
-
-  useEffect(() => {
-    const loadTranslation = async () => {
-      setIsTranslating(true);
-      try {
-        const translated = await translateRecipe(originalRecipe, language);
-        setTranslatedRecipe(translated);
-      } catch (error) {
-        console.error('Error translating recipe:', error);
-        setTranslatedRecipe(originalRecipe);
-      } finally {
-        setIsTranslating(false);
-      }
-    };
-
-    loadTranslation();
-  }, [language, recipeKey]);
-
-  if (isTranslating) {
-    return (
-      <View style={[styles.container, styles.loadingContainer, { backgroundColor: colors.background }]}>
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={[styles.loadingText, { color: colors.textSecondary }]}>
-          {t('recipes.translating') || 'Translating...'}
-        </Text>
-      </View>
-    );
-  }
+  const recipe = originalRecipe;
 
   return (
     <ScrollView
@@ -91,13 +58,13 @@ export const RecipeDetailScreen = () => {
       contentContainerStyle={{ paddingBottom: 32 }}
     >
       <View style={styles.header}>
-        <Text style={styles.title}>{translatedRecipe.name}</Text>
-        <Text style={styles.description}>{translatedRecipe.description}</Text>
+        <Text style={styles.title}>{recipe.name}</Text>
+        <Text style={styles.description}>{recipe.description}</Text>
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('recipes.ingredients')}</Text>
-        {translatedRecipe.ingredients?.map((ingredient: string, index: number) => (
+        {recipe.ingredients?.map((ingredient: string, index: number) => (
           <Text key={`${ingredient}-${index}`} style={styles.item}>
             - {ingredient}
           </Text>
@@ -106,7 +73,7 @@ export const RecipeDetailScreen = () => {
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>{t('recipes.steps')}</Text>
-        {translatedRecipe.steps?.map((step: string, index: number) => (
+        {recipe.steps?.map((step: string, index: number) => (
           <Text key={`${step.substring(0, 20)}-${index}`} style={styles.item}>
             {index + 1}. {step}
           </Text>
@@ -120,14 +87,6 @@ const createStyles = (colors: ThemeColors) =>
   StyleSheet.create({
     container: {
       flex: 1,
-    },
-    loadingContainer: {
-      justifyContent: 'center',
-      alignItems: 'center',
-      gap: 12,
-    },
-    loadingText: {
-      fontSize: 15,
     },
     header: {
       paddingHorizontal: 24,

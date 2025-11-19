@@ -4,10 +4,9 @@ import { useAuth } from '@/providers/AuthProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import { useToast } from '@/providers/ToastProvider';
-import { useLanguage } from '@/providers/LanguageProvider';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/lib/i18n';
 import {
   ActivityIndicator,
   RefreshControl,
@@ -29,7 +28,6 @@ export const ProfileScreen = () => {
   const { user, signOut } = useAuth();
   const { showToast } = useToast();
   const { colors, mode, toggleTheme } = useThemeMode();
-  const { language, setLanguage, loading: translationLoading } = useLanguage();
   const { t } = useTranslation();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -256,7 +254,7 @@ export const ProfileScreen = () => {
             <TextInput
               value={fullName}
               onChangeText={setFullName}
-              placeholder="Pablo Mérida"
+              placeholder={t('profile.fullNamePlaceholder')}
               placeholderTextColor={colors.inputPlaceholder}
               style={[
                 styles.input,
@@ -349,59 +347,6 @@ export const ProfileScreen = () => {
           </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
-
-          <View style={styles.settingRow}>
-            <View style={styles.settingCopy}>
-              <Text style={[styles.settingTitle, { color: colors.textPrimary }]}>{t('profile.language')}</Text>
-              <Text style={[styles.settingSubtitle, { color: colors.textMuted }]}>
-                {t('profile.languageDesc')}
-              </Text>
-            </View>
-            {translationLoading ? (
-              <ActivityIndicator size="small" color={colors.primary} />
-            ) : (
-              <View style={styles.languageButtons}>
-                <TouchableOpacity
-                  style={[
-                    styles.languageButton,
-                    {
-                      backgroundColor: language === 'en' ? colors.primary : colors.surfaceMuted,
-                      borderColor: language === 'en' ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => setLanguage('en')}
-                >
-                  <Text
-                    style={[
-                      styles.languageButtonText,
-                      { color: language === 'en' ? colors.primaryContrast : colors.textSecondary },
-                    ]}
-                  >
-                    EN
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.languageButton,
-                    {
-                      backgroundColor: language === 'es' ? colors.primary : colors.surfaceMuted,
-                      borderColor: language === 'es' ? colors.primary : colors.border,
-                    },
-                  ]}
-                  onPress={() => setLanguage('es')}
-                >
-                  <Text
-                    style={[
-                      styles.languageButtonText,
-                      { color: language === 'es' ? colors.primaryContrast : colors.textSecondary },
-                    ]}
-                  >
-                    ES
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
 
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
 
@@ -605,22 +550,6 @@ const createStyles = (colors: ThemeColors) =>
     },
     settingSubtitle: {
       fontSize: 14,
-    },
-    languageButtons: {
-      flexDirection: 'row',
-      gap: 8,
-    },
-    languageButton: {
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      borderRadius: 8,
-      borderWidth: 1,
-      minWidth: 50,
-      alignItems: 'center',
-    },
-    languageButtonText: {
-      fontSize: 14,
-      fontWeight: '600',
     },
     divider: {
       height: StyleSheet.hairlineWidth,

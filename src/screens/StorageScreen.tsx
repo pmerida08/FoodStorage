@@ -4,14 +4,12 @@ import { useThemeMode } from '@/providers/ThemeProvider';
 import { useNavigation } from '@react-navigation/native';
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import { Calendar, Package2, Plus, Search, Snowflake, Refrigerator, Package, Trash2 } from 'lucide-react-native';
-import { useMemo, useState, useEffect, useRef, useCallback } from 'react';
-import { useTranslation } from 'react-i18next';
+import { useMemo, useState, useRef, useCallback } from 'react';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { deleteStorageItem, getStorageItems, getItemStatus } from '@/lib/supabase/storageService';
-import { useLanguage } from '@/providers/LanguageProvider';
-import { translateText } from '@/lib/i18n/contentTranslation';
 import { useToast } from '@/providers/ToastProvider';
+import { useTranslation } from '@/lib/i18n';
 import {
   ActivityIndicator,
   Alert,
@@ -29,9 +27,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
-type TranslatedItem = ReturnType<typeof getStorageItems> extends Promise<infer T>
-  ? T[number] & { translatedName: string }
-  : never;
+type StorageItem = Awaited<ReturnType<typeof getStorageItems>>[number];
 
 type LocationFilter = 'all' | 'freezer' | 'fridge' | 'larder';
 
@@ -40,9 +36,8 @@ export const StorageScreen = () => {
   const [query, setQuery] = useState('');
   const [locationFilter, setLocationFilter] = useState<LocationFilter>('all');
   const { colors } = useThemeMode();
-  const { t } = useTranslation();
   const { user } = useAuth();
-  const { language } = useLanguage();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const { showToast } = useToast();
   const queryClient = useQueryClient();
@@ -84,23 +79,6 @@ export const StorageScreen = () => {
     enabled: Boolean(user?.id),
   });
 
-  const [translatedItems, setTranslatedItems] = useState<TranslatedItem[]>([]);
-
-  useEffect(() => {
-    const translateItems = async () => {
-      const translated = await Promise.all(
-        items.map(async (item) => ({
-          ...item,
-          translatedName: await translateText(item.name, language),
-        })),
-      );
-      setTranslatedItems(translated);
-    };
-
-    if (items.length > 0) {
-      translateItems();
-    }
-  }, [items, language]);
 
   const deleteItemMutation = useMutation({
     mutationFn: async ({ id }: { id: string; name: string }) => {
@@ -112,20 +90,17 @@ export const StorageScreen = () => {
     onSuccess: (_result, variables) => {
       void queryClient.invalidateQueries({ queryKey: ['storage-items', user?.id] });
       showToast({
-        title: t('storage.deleteSuccessTitle', { defaultValue: 'Item removed' }),
-        message: t('storage.deleteSuccessMsg', {
-          defaultValue: `${variables.name} was removed from your storage.`,
-          name: variables.name,
-        }),
+        title: t('storage.deleteSuccessTitle'),
+        message: t('storage.deleteSuccessMsg', { name: variables.name }),
       });
     },
     onError: (error) => {
       const message =
         error instanceof Error
           ? error.message
-          : t('storage.deleteErrorMessage', { defaultValue: 'Please try again later.' });
+          : t('storage.deleteErrorMessage');
       showToast({
-        title: t('storage.deleteErrorTitle', { defaultValue: 'Could not delete item' }),
+        title: t('storage.deleteErrorTitle'),
         message,
         type: 'error',
       });
@@ -145,27 +120,24 @@ export const StorageScreen = () => {
   );
 
   const handleDeleteItem = useCallback(
-    (item: TranslatedItem) => {
+    (item: StorageItem) => {
       Alert.alert(
-        t('storage.deleteTitle', { defaultValue: 'Remove item?' }),
-        t('storage.deleteMessage', {
-          defaultValue: 'This will remove {{name}} from your storage.',
-          name: item.translatedName,
-        }),
+        t('storage.deleteTitle'),
+        t('storage.deleteMessage', { name: item.name }),
         [
           {
-            text: t('common.cancel', { defaultValue: 'Cancel' }),
+            text: t('common.cancel'),
             style: 'cancel',
             onPress: () => {
               swipeableRefs.current[item.id]?.close();
             },
           },
           {
-            text: t('common.delete', { defaultValue: 'Delete' }),
+            text: t('common.delete'),
             style: 'destructive',
             onPress: () => {
               swipeableRefs.current[item.id]?.close();
-              deleteItemMutation.mutate({ id: item.id, name: item.translatedName });
+              deleteItemMutation.mutate({ id: item.id, name: item.name });
             },
           },
         ],
@@ -175,11 +147,7 @@ export const StorageScreen = () => {
   );
 
   const renderSwipeActions = useCallback(
-    (
-      item: TranslatedItem,
-      progress: Animated.AnimatedInterpolation<number>,
-      _dragX: Animated.AnimatedInterpolation<number>,
-    ) => {
+    (item: StorageItem, progress: Animated.AnimatedInterpolation<number>, _dragX: Animated.AnimatedInterpolation<number>) => {
       const translateX = progress.interpolate({
         inputRange: [0, 1],
         outputRange: [64, 0],
@@ -197,14 +165,14 @@ export const StorageScreen = () => {
             style={styles.deleteActionButton}
             onPress={() => handleDeleteItem(item)}
             disabled={deleteItemMutation.isPending}
-            accessibilityLabel={t('storage.deleteActionLabel', { defaultValue: 'Delete item' })}
+            accessibilityLabel={t('storage.deleteActionLabel')}
           >
             {deletingThisItem ? (
               <ActivityIndicator color={colors.surface} />
             ) : (
               <Trash2 size={20} color={colors.surface} />
             )}
-            <Text style={styles.deleteActionText}>{t('common.delete', { defaultValue: 'Delete' })}</Text>
+            <Text style={styles.deleteActionText}>{t('common.delete')}</Text>
           </TouchableOpacity>
         </Animated.View>
       );
@@ -213,24 +181,19 @@ export const StorageScreen = () => {
   );
 
   const filtered = useMemo(() => {
-    let result = translatedItems;
+    let result = items;
 
-    // Filter by location
     if (locationFilter !== 'all') {
-      result = result.filter(
-        (item) => item.storage_locations?.type === locationFilter,
-      );
+      result = result.filter((item) => item.storage_locations?.type === locationFilter);
     }
 
-    // Filter by search query
-    if (query) {
-      result = result.filter((item) =>
-        item.translatedName.toLowerCase().includes(query.toLowerCase()),
-      );
+    if (query.trim()) {
+      const lowered = query.toLowerCase();
+      result = result.filter((item) => item.name.toLowerCase().includes(lowered));
     }
 
     return result;
-  }, [translatedItems, query, locationFilter]);
+  }, [items, locationFilter, query]);
 
   if (isLoading && !items.length) {
     return (
@@ -239,7 +202,7 @@ export const StorageScreen = () => {
           <View style={styles.loadingState}>
             <ActivityIndicator color={colors.primary} size="large" />
             <Text style={[styles.loadingLabel, { color: colors.textSecondary }]}>
-              {t('storage.title')}...
+              {t('storage.title')}
             </Text>
           </View>
         </SafeAreaView>
@@ -293,7 +256,7 @@ export const StorageScreen = () => {
                     { color: locationFilter === 'all' ? colors.primary : colors.textSecondary },
                   ]}
                 >
-                  {t('common.all') || 'All'}
+                  {t('common.all')}
                 </Text>
               </TouchableOpacity>
 
@@ -333,10 +296,8 @@ export const StorageScreen = () => {
         ListEmptyComponent={
           <View style={styles.emptyState}>
             <Package2 size={48} color={colors.textMuted} />
-            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>No items yet</Text>
-            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>
-              Add items to start tracking your food storage
-            </Text>
+            <Text style={[styles.emptyTitle, { color: colors.textPrimary }]}>{t('storage.emptyTitle')}</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.textSecondary }]}>{t('storage.emptySubtitle')}</Text>
           </View>
         }
         renderItem={({ item }) => {
@@ -376,7 +337,7 @@ export const StorageScreen = () => {
                       <LocationIcon size={20} color={locationInfo?.color || colors.primary} />
                     </View>
                     <View style={styles.cardTextContainer}>
-                      <Text style={styles.cardTitle}>{item.translatedName}</Text>
+                      <Text style={styles.cardTitle}>{item.name}</Text>
                       <View style={styles.cardSubtitleRow}>
                         {displayQuantity ? <Text style={styles.cardSubtitle}>{displayQuantity}</Text> : null}
                         {displayQuantity && locationInfo && <Text style={styles.cardSubtitle}> • </Text>}

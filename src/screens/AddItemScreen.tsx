@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useCallback } from 'react';
+import { useMemo, useState, useCallback } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -24,19 +24,13 @@ import type { RootStackParamList } from '@/navigation/types';
 import { useToast } from '@/providers/ToastProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/lib/i18n';
 import { useAuth } from '@/providers/AuthProvider';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { getStorageLocations, createStorageItem } from '@/lib/supabase/storageService';
-import { useLanguage } from '@/providers/LanguageProvider';
-import { translateText } from '@/lib/i18n/contentTranslation';
 import { parseReceiptLines, recognizeReceiptText } from '@/lib/ocr';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
-
-type TranslatedLocation = Awaited<ReturnType<typeof getStorageLocations>>[number] & {
-  translatedName: string;
-};
 
 type AddItemMode = 'manual' | 'receipt';
 
@@ -131,7 +125,6 @@ export const AddItemScreen = () => {
   const { colors } = useThemeMode();
   const { t } = useTranslation();
   const { user } = useAuth();
-  const { language } = useLanguage();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(colors), [colors]);
   const [mode, setMode] = useState<AddItemMode>('manual');
@@ -155,7 +148,6 @@ export const AddItemScreen = () => {
     enabled: Boolean(user?.id),
   });
 
-  const [translatedLocations, setTranslatedLocations] = useState<TranslatedLocation[]>([]);
   const updateReceiptAttachment = useCallback((attachment: NormalizedReceiptAsset | null) => {
     if (!attachment) {
       setReceiptImageUri(null);
@@ -165,19 +157,6 @@ export const AddItemScreen = () => {
     setReceiptImageUri(attachment.uri);
     setReceiptDisplayName(attachment.displayName);
   }, []);
-  const translateNameToEnglish = useCallback(
-    async (value: string) => {
-      const trimmed = value.trim();
-      if (!trimmed) {
-        return trimmed;
-      }
-      if (language === 'en') {
-        return trimmed;
-      }
-      return translateText(trimmed, 'en', { force: true });
-    },
-    [language],
-  );
   const normalizedToday = useMemo(() => {
     const now = new Date();
     now.setHours(0, 0, 0, 0);
@@ -188,7 +167,7 @@ export const AddItemScreen = () => {
       return t('addItem.expiryPlaceholder');
     }
     try {
-      return new Intl.DateTimeFormat(language, {
+      return new Intl.DateTimeFormat(undefined, {
         year: 'numeric',
         month: 'short',
         day: 'numeric',
@@ -196,35 +175,16 @@ export const AddItemScreen = () => {
     } catch {
       return expiryDate.toLocaleDateString();
     }
-  }, [expiryDate, language, t]);
+  }, [expiryDate, t]);
 
-  useEffect(() => {
-    if (!locations.length) {
-      setTranslatedLocations((prev) => (prev.length ? [] : prev));
-      return;
-    }
-
-    const translateLocationNames = async () => {
-      const translated = await Promise.all(
-        locations.map(async (location) => ({
-          ...location,
-          translatedName: await translateText(location.name, language),
-        })),
-      );
-      setTranslatedLocations(translated);
-    };
-
-    translateLocationNames();
-  }, [locations, language]);
-
-  const defaultLocationId = useMemo(() => translatedLocations[0]?.id ?? '', [translatedLocations]);
+  const defaultLocationId = useMemo(() => locations[0]?.id ?? '', [locations]);
 
   const addItemMutation = useMutation({
     mutationFn: async () => {
-      const englishName = await translateNameToEnglish(form.name);
+      const normalizedName = form.name.trim();
       return createStorageItem(
         {
-          name: englishName,
+          name: normalizedName || form.name,
           quantity: form.quantity || null,
           unit: form.unit || null,
           storage_location_id: form.storageLocationId,
@@ -235,13 +195,12 @@ export const AddItemScreen = () => {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['storage-items'] });
-      const location = translatedLocations.find((loc) => loc.id === form.storageLocationId);
+      const location = locations.find((loc) => loc.id === form.storageLocationId);
       showToast({
         title: t('addItem.itemAdded'),
-        message: t('addItem.itemAddedMsg', {
-          name: form.name,
-          location: location?.translatedName || location?.name || '',
-        }),
+        message: location
+          ? t('addItem.itemAddedMsg', { name: form.name, location: location.name })
+          : t('addItem.itemAddedMsg', { name: form.name, location: t('addItem.storageLocation') }),
       });
       navigation.goBack();
     },
@@ -255,10 +214,10 @@ export const AddItemScreen = () => {
     mutationFn: async (items: BatchItem[]) => {
       await Promise.all(
         items.map(async (item) => {
-          const englishName = await translateNameToEnglish(item.name);
+          const normalizedName = item.name.trim() || item.name;
           return createStorageItem(
             {
-              name: englishName,
+              name: normalizedName,
               quantity: item.quantity || null,
               unit: item.unit || null,
               storage_location_id: item.storageLocationId,
@@ -272,11 +231,8 @@ export const AddItemScreen = () => {
     onSuccess: (_, addedItems) => {
       queryClient.invalidateQueries({ queryKey: ['storage-items'] });
       showToast({
-        title: t('addItem.itemsAdded', { defaultValue: 'Items added' }),
-        message: t('addItem.itemsAddedMsg', {
-          defaultValue: `Added ${addedItems.length} items from the receipt.`,
-          count: addedItems.length,
-        }),
+        title: t('addItem.itemsAdded'),
+        message: t('addItem.itemsAddedMsg', { count: addedItems.length }),
       });
       setBatchItems([]);
       setEditingItemId(null);
@@ -286,7 +242,7 @@ export const AddItemScreen = () => {
     onError: (error: unknown) => {
       const message = error instanceof Error ? error.message : 'Failed to add items';
       showToast({
-        title: t('addItem.itemsAddedError', { defaultValue: 'Could not add items' }),
+        title: t('addItem.itemsAddedError'),
         message,
         type: 'error',
       });
@@ -299,8 +255,8 @@ export const AddItemScreen = () => {
 
   const handleDateValidationError = () => {
     showToast({
-      title: t('addItem.expiryInvalidTitle', { defaultValue: 'Choose a valid date' }),
-      message: t('addItem.expiryInvalidMsg', { defaultValue: 'Expiry must be today or later.' }),
+      title: t('addItem.expiryInvalidTitle'),
+      message: t('addItem.expiryInvalidMsg'),
       type: 'error',
     });
   };
@@ -341,11 +297,11 @@ export const AddItemScreen = () => {
 
   const handleSubmit = () => {
     if (!form.name.trim()) {
-      showToast({ title: 'Error', message: 'Please enter an item name', type: 'error' });
+      showToast({ title: t('addItem.itemName'), message: t('addItem.itemNamePlaceholder'), type: 'error' });
       return;
     }
     if (!form.storageLocationId) {
-      showToast({ title: 'Error', message: 'Please select a storage location', type: 'error' });
+      showToast({ title: t('addItem.storageLocation'), message: t('addItem.locationMissingMsg'), type: 'error' });
       return;
     }
     addItemMutation.mutate();
@@ -360,10 +316,8 @@ export const AddItemScreen = () => {
 
       if (!permission.granted || permission.status !== ImagePicker.PermissionStatus.GRANTED) {
         showToast({
-          title: t('addItem.permissionDeniedTitle', { defaultValue: 'Permission needed' }),
-          message: t('addItem.permissionDeniedMsg', {
-            defaultValue: 'Please allow access so we can read the receipt photo.',
-          }),
+          title: t('addItem.permissionDeniedTitle'),
+          message: t('addItem.permissionDeniedMsg'),
           type: 'error',
         });
         return;
@@ -396,15 +350,13 @@ export const AddItemScreen = () => {
       setBatchItems([]);
       setEditingItemId(null);
       showToast({
-        title: t('addItem.receiptReadyTitle', { defaultValue: 'Receipt ready' }),
-        message: t('addItem.receiptReadyMsg', {
-          defaultValue: 'Process the receipt to detect items automatically.',
-        }),
+        title: t('addItem.receiptReadyTitle'),
+        message: t('addItem.receiptReadyMsg'),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to access the selected photo.';
       showToast({
-        title: t('addItem.receiptReadyError', { defaultValue: 'Could not attach receipt' }),
+        title: t('addItem.receiptReadyError'),
         message,
         type: 'error',
       });
@@ -413,23 +365,21 @@ export const AddItemScreen = () => {
 
   const handleAttachPhoto = () => {
     Alert.alert(
-      t('addItem.attachReceiptTitle', { defaultValue: 'Attach receipt' }),
-      t('addItem.attachReceiptSubtitle', {
-        defaultValue: 'Choose whether to capture a new photo or pick one from your gallery.',
-      }),
+      t('addItem.attachReceiptTitle'),
+      t('addItem.attachReceiptSubtitle'),
       [
         {
-          text: t('common.cancel', { defaultValue: 'Cancel' }),
+          text: t('common.cancel'),
           style: 'cancel',
         },
         {
-          text: t('addItem.useCameraAction', { defaultValue: 'Use camera' }),
+          text: t('addItem.useCameraAction'),
           onPress: () => {
             void launchPicker('camera');
           },
         },
         {
-          text: t('addItem.chooseLibraryAction', { defaultValue: 'Choose photo' }),
+          text: t('addItem.chooseLibraryAction'),
           onPress: () => {
             void launchPicker('library');
           },
@@ -441,10 +391,8 @@ export const AddItemScreen = () => {
   const handleProcessReceipt = async () => {
     if (!receiptImageUri) {
       showToast({
-        title: t('addItem.attachReceiptFirstTitle', { defaultValue: 'Add a receipt photo first' }),
-        message: t('addItem.attachReceiptFirstMsg', {
-          defaultValue: 'Attach a receipt so we know what to process.',
-        }),
+        title: t('addItem.attachReceiptFirstTitle'),
+        message: t('addItem.attachReceiptFirstMsg'),
         type: 'error',
       });
       return;
@@ -452,10 +400,8 @@ export const AddItemScreen = () => {
 
     if (!defaultLocationId) {
       showToast({
-        title: t('addItem.noLocationsTitle', { defaultValue: 'Add a location first' }),
-        message: t('addItem.noLocationsMsg', {
-          defaultValue: 'Create at least one storage location to continue.',
-        }),
+        title: t('addItem.noLocationsTitle'),
+        message: t('addItem.noLocationsMsg'),
         type: 'error',
       });
       return;
@@ -467,10 +413,8 @@ export const AddItemScreen = () => {
       const { lines, durationMs } = await recognizeReceiptText(receiptImageUri);
       if (!lines.length) {
         showToast({
-          title: t('addItem.ocrNoTextTitle', { defaultValue: 'No text detected' }),
-          message: t('addItem.ocrNoTextMsg', {
-            defaultValue: 'Try a clearer photo with better lighting.',
-          }),
+          title: t('addItem.ocrNoTextTitle'),
+          message: t('addItem.ocrNoTextMsg'),
           type: 'error',
         });
         setBatchItems([]);
@@ -480,10 +424,8 @@ export const AddItemScreen = () => {
       const parsedItems = await parseReceiptLines(lines);
       if (!parsedItems.length) {
         showToast({
-          title: t('addItem.ocrNoItemsTitle', { defaultValue: 'No products found' }),
-          message: t('addItem.ocrNoItemsMsg', {
-            defaultValue: 'We could not match any lines to products. Please edit manually.',
-          }),
+          title: t('addItem.ocrNoItemsTitle'),
+          message: t('addItem.ocrNoItemsMsg'),
           type: 'error',
         });
         setBatchItems([]);
@@ -503,20 +445,14 @@ export const AddItemScreen = () => {
 
       const seconds = (durationMs / 1000).toFixed(1);
       showToast({
-        title: t('addItem.ocrSuccessTitle', { defaultValue: 'Receipt processed' }),
-        message: t('addItem.ocrSuccessMsg', {
-          defaultValue: `Detected ${parsedItems.length} items in ${seconds}s.`,
-          count: parsedItems.length,
-          seconds,
-        }),
+        title: t('addItem.ocrSuccessTitle'),
+        message: t('addItem.ocrSuccessMsg', { count: parsedItems.length, seconds }),
       });
     } catch (error) {
       const message =
-        error instanceof Error
-          ? error.message
-          : t('addItem.ocrFailedGeneric', { defaultValue: 'An unknown error occurred while running OCR.' });
+        error instanceof Error ? error.message : t('addItem.ocrFailedGeneric');
       showToast({
-        title: t('addItem.ocrErrorTitle', { defaultValue: 'Could not process receipt' }),
+        title: t('addItem.ocrErrorTitle'),
         message,
         type: 'error',
       });
@@ -544,10 +480,8 @@ export const AddItemScreen = () => {
     const selectedItems = batchItems.filter((item) => item.selected);
     if (!selectedItems.length) {
       showToast({
-        title: t('addItem.selectItemsTitle', { defaultValue: 'Select at least one item' }),
-        message: t('addItem.selectItemsMsg', {
-          defaultValue: 'Choose the items you want to import before continuing.',
-        }),
+        title: t('addItem.selectItemsTitle'),
+        message: t('addItem.selectItemsMsg'),
         type: 'error',
       });
       return;
@@ -555,10 +489,8 @@ export const AddItemScreen = () => {
     const missingLocation = selectedItems.find((item) => !item.storageLocationId);
     if (missingLocation) {
       showToast({
-        title: t('addItem.locationMissingTitle', { defaultValue: 'Location required' }),
-        message: t('addItem.locationMissingMsg', {
-          defaultValue: 'Please pick a storage location for every selected item.',
-        }),
+        title: t('addItem.locationMissingTitle'),
+        message: t('addItem.locationMissingMsg'),
         type: 'error',
       });
       return;
@@ -588,7 +520,7 @@ export const AddItemScreen = () => {
 
       <View style={[styles.section, styles.row]}>
         <View style={[styles.section, { flex: 1 }]}>
-          <Text style={styles.label}>{t('addItem.quantity')}</Text>
+          <Text style={styles.label}>{t('addItem.unit')}</Text>
           <TextInput
             style={styles.input}
             placeholder={t('addItem.quantityPlaceholder')}
@@ -599,10 +531,10 @@ export const AddItemScreen = () => {
           />
         </View>
         <View style={[styles.section, { flex: 1 }]}>
-          <Text style={styles.label}>Unit</Text>
+          <Text style={styles.label}>{t('addItem.quantity')}</Text>
           <TextInput
             style={styles.input}
-            placeholder="g, kg, pcs"
+            placeholder={t('addItem.unitPlaceholder')}
             placeholderTextColor={colors.inputPlaceholder}
             value={form.unit}
             onChangeText={(value) => setField('unit', value)}
@@ -613,7 +545,7 @@ export const AddItemScreen = () => {
       <View style={styles.section}>
         <Text style={styles.label}>{t('addItem.storageLocation')}</Text>
         <View style={styles.locationButtons}>
-          {translatedLocations.map((location) => (
+          {locations.map((location) => (
             <TouchableOpacity
               key={location.id}
               style={[
@@ -635,7 +567,7 @@ export const AddItemScreen = () => {
                   },
                 ]}
               >
-                {location.translatedName}
+                {location.name}
               </Text>
             </TouchableOpacity>
           ))}
@@ -665,7 +597,7 @@ export const AddItemScreen = () => {
               style={styles.iosPicker}
             />
             <TouchableOpacity style={styles.iosPickerDone} onPress={() => setIsDatePickerVisible(false)}>
-              <Text style={styles.iosPickerDoneText}>{t('common.done')}</Text>
+              <Text style={styles.iosPickerDoneText}>Done</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -686,32 +618,21 @@ export const AddItemScreen = () => {
   const renderReceiptFlow = () => (
     <>
       <View style={styles.section}>
-        <Text style={styles.label}>{t('addItem.receiptCapture', { defaultValue: 'Receipt capture' })}</Text>
-        <Text style={styles.helperText}>
-          {t('addItem.receiptCaptureHint', {
-            defaultValue: 'Snap a ticket or load a photo so OCR can detect the products.',
-          })}
-        </Text>
+        <Text style={styles.label}>{t('addItem.receiptCapture')}</Text>
+        <Text style={styles.helperText}>{t('addItem.receiptCaptureHint')}</Text>
         <TouchableOpacity style={styles.receiptUpload} onPress={handleAttachPhoto}>
           <View style={styles.receiptPlaceholder}>
             <Camera size={26} color={colors.textMuted} />
             <View style={{ flex: 1 }}>
               <Text style={styles.receiptPlaceholderTitle}>
-                {receiptReady
-                  ? t('addItem.receiptReady', { defaultValue: 'Receipt attached' })
-                  : t('addItem.attachReceipt', { defaultValue: 'Tap to attach receipt photo' })}
+                {receiptReady ? t('addItem.receiptReady') : t('addItem.attachReceipt')}
               </Text>
               <Text style={styles.receiptPlaceholderSubtitle}>
                 {receiptReady
                   ? t('addItem.receiptReadySubtitle', {
-                      defaultValue: receiptFileName
-                        ? `Using ${receiptFileName}. Run OCR to extract the items listed on the ticket.`
-                        : 'Run OCR to extract the items listed on the ticket.',
-                      fileName: receiptFileName,
+                      fileName: receiptDisplayName || t('addItem.receiptReady'),
                     })
-                  : t('addItem.attachReceiptSubtitle', {
-                      defaultValue: 'Use your gallery or camera. Photos stay on your device.',
-                    })}
+                  : t('addItem.attachReceiptSubtitle')}
               </Text>
             </View>
           </View>
@@ -725,9 +646,7 @@ export const AddItemScreen = () => {
             {isProcessingReceipt ? (
               <ActivityIndicator color={colors.primaryContrast} />
             ) : (
-              <Text style={styles.scanButtonText}>
-                {t('addItem.processReceipt', { defaultValue: 'Process receipt (OCR beta)' })}
-              </Text>
+              <Text style={styles.scanButtonText}>{t('addItem.processReceipt')}</Text>
             )}
           </TouchableOpacity>
         </View>
@@ -735,26 +654,14 @@ export const AddItemScreen = () => {
 
       {batchItems.length === 0 ? (
         <View style={styles.batchEmptyState}>
-          <Text style={styles.batchEmptyTitle}>
-            {t('addItem.noOCRItemsTitle', { defaultValue: 'No detected items yet' })}
-          </Text>
-          <Text style={styles.batchEmptySubtitle}>
-            {t('addItem.noOCRItemsSubtitle', {
-              defaultValue: 'Once OCR finds products they will appear here for review.',
-            })}
-          </Text>
+          <Text style={styles.batchEmptyTitle}>{t('addItem.noOCRItemsTitle')}</Text>
+          <Text style={styles.batchEmptySubtitle}>{t('addItem.noOCRItemsSubtitle')}</Text>
         </View>
       ) : (
         <>
           <View style={styles.section}>
-            <Text style={styles.label}>
-              {t('addItem.reviewItems', { defaultValue: 'Review & edit before saving' })}
-            </Text>
-            <Text style={styles.helperText}>
-              {t('addItem.reviewHelper', {
-                defaultValue: 'Toggle items, edit details and choose the correct storage location.',
-              })}
-            </Text>
+            <Text style={styles.label}>{t('addItem.reviewItems')}</Text>
+            <Text style={styles.helperText}>{t('addItem.reviewHelper')}</Text>
           </View>
 
           <View style={styles.batchList}>
@@ -804,23 +711,23 @@ export const AddItemScreen = () => {
                     <View style={[styles.row, { marginTop: 8 }]}>
                       <TextInput
                         style={[styles.input, { flex: 1 }]}
-                        value={item.quantity}
-                        onChangeText={(value) => updateBatchItem(item.id, { quantity: value })}
-                        placeholder={t('addItem.quantityPlaceholder')}
-                        placeholderTextColor={colors.inputPlaceholder}
-                        keyboardType="numeric"
+                   value={item.quantity}
+                   onChangeText={(value) => updateBatchItem(item.id, { quantity: value })}
+                   placeholder={t('addItem.quantityPlaceholder')}
+                   placeholderTextColor={colors.inputPlaceholder}
+                   keyboardType="numeric"
                       />
                       <TextInput
                         style={[styles.input, { flex: 1 }]}
                         value={item.unit}
                         onChangeText={(value) => updateBatchItem(item.id, { unit: value })}
-                        placeholder="g, kg, pcs"
+                        placeholder={t('addItem.unitPlaceholder')}
                         placeholderTextColor={colors.inputPlaceholder}
                       />
                     </View>
                     <TouchableOpacity style={styles.doneButton} onPress={() => setEditingItemId(null)}>
                       <Text style={styles.doneButtonText}>
-                        {t('common.done', { defaultValue: 'Done' })}
+                        {t('common.done')}
                       </Text>
                     </TouchableOpacity>
                   </View>
@@ -829,16 +736,14 @@ export const AddItemScreen = () => {
                     <Text style={styles.batchDetailsText}>
                       {item.quantity
                         ? `${item.quantity} ${item.unit}`.trim()
-                        : t('addItem.noQuantity', { defaultValue: 'No quantity' })}
+                        : t('addItem.noQuantity')}
                     </Text>
                   </View>
                 )}
 
-                <Text style={[styles.label, { marginTop: 12 }]}>
-                  {t('addItem.storageLocation')}
-                </Text>
+                <Text style={[styles.label, { marginTop: 12 }]}>{t('addItem.storageLocation')}</Text>
                 <View style={styles.locationButtons}>
-                  {translatedLocations.map((location) => (
+                  {locations.map((location) => (
                     <TouchableOpacity
                       key={location.id}
                       style={[
@@ -863,7 +768,7 @@ export const AddItemScreen = () => {
                           },
                         ]}
                       >
-                        {location.translatedName}
+                        {location.name}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -874,20 +779,12 @@ export const AddItemScreen = () => {
 
           <View style={styles.summaryCard}>
             <Text style={styles.summaryText}>
-              {t('addItem.summarySelected', {
-                defaultValue: '{{count}} items selected',
-                count: selectedBatchItems.length,
-              })}
+              {t('addItem.summarySelected', { count: selectedBatchItems.length })}
             </Text>
             <Text style={styles.summarySubText}>
               {missingLocationCount > 0
-                ? t('addItem.summaryMissing', {
-                    defaultValue: '{{count}} items still need a location',
-                    count: missingLocationCount,
-                  })
-                : t('addItem.summaryReady', {
-                    defaultValue: 'All selected items have a destination',
-                  })}
+                ? t('addItem.summaryMissing', { count: missingLocationCount })
+                : t('addItem.summaryReady')}
             </Text>
           </View>
 
@@ -900,15 +797,13 @@ export const AddItemScreen = () => {
             disabled={!canSubmitBatch || batchAddMutation.isPending}
           >
             <Text style={styles.submitText}>
-              {batchAddMutation.isPending
-                ? t('addItem.saving')
-                : t('addItem.addSelectedItems', { defaultValue: 'Add selected items' })}
+              {batchAddMutation.isPending ? t('addItem.saving') : t('addItem.addSelectedItems')}
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.secondaryButton} onPress={() => setBatchItems([])}>
             <Text style={styles.secondaryButtonText}>
-              {t('addItem.clearItems', { defaultValue: 'Clear list' })}
+              {t('addItem.clearItems')}
             </Text>
           </TouchableOpacity>
         </>
@@ -924,7 +819,7 @@ export const AddItemScreen = () => {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.section}>
           <Text style={styles.label}>
-            {t('addItem.modeTitle', { defaultValue: 'How would you like to add items?' })}
+            {t('addItem.modeTitle')}
           </Text>
           <View style={styles.modeToggle}>
             <TouchableOpacity
@@ -935,12 +830,10 @@ export const AddItemScreen = () => {
               onPress={() => setMode('manual')}
             >
               <Text style={styles.modeButtonTitle}>
-                {t('addItem.manualModeTitle', { defaultValue: 'Manual entry' })}
+                {t('addItem.manualModeTitle')}
               </Text>
               <Text style={styles.modeButtonSubtitle}>
-                {t('addItem.manualModeSubtitle', {
-                  defaultValue: 'Fill out the form for a single product.',
-                })}
+                {t('addItem.manualModeSubtitle')}
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
@@ -951,12 +844,10 @@ export const AddItemScreen = () => {
               onPress={() => setMode('receipt')}
             >
               <Text style={styles.modeButtonTitle}>
-                {t('addItem.ocrModeTitle', { defaultValue: 'Scan receipt (OCR)' })}
+                {t('addItem.ocrModeTitle')}
               </Text>
               <Text style={styles.modeButtonSubtitle}>
-                {t('addItem.ocrModeSubtitle', {
-                  defaultValue: 'Detect multiple products from a ticket photo.',
-                })}
+                {t('addItem.ocrModeSubtitle')}
               </Text>
             </TouchableOpacity>
           </View>

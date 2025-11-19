@@ -14,7 +14,7 @@ import { useToast } from '@/providers/ToastProvider';
 import { useAuth } from '@/providers/AuthProvider';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from '@/lib/i18n';
 
 type Mode = 'signin' | 'signup';
 
@@ -94,7 +94,7 @@ export const AuthScreen = () => {
       behavior={Platform.select({ ios: 'padding', android: undefined })}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{t('auth.title')}</Text>
+        <Text style={styles.title}>{AUTH_COPY.title}</Text>
         <Text style={styles.subtitle}>
           {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
         </Text>

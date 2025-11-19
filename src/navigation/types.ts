@@ -4,6 +4,7 @@ export type AppTabsParamList = {
   Home: undefined;
   Storage: undefined;
   Recipes: undefined;
+  Cards: undefined;
   Favorites: undefined;
   Profile: undefined;
 };

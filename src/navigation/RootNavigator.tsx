@@ -8,6 +8,7 @@ import { AuthScreen } from '@/screens/AuthScreen';
 import { AddItemScreen } from '@/screens/AddItemScreen';
 import { RecipeDetailScreen } from '@/screens/RecipeDetailScreen';
 import { useThemeMode } from '@/providers/ThemeProvider';
+import { useTranslation } from '@/lib/i18n';
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
@@ -49,6 +50,7 @@ const LoadingState = () => {
 export const RootNavigator = () => {
   const { user, loading } = useAuth();
   const { mode } = useThemeMode();
+  const { t } = useTranslation();
 
   const navigationTheme = mode === 'dark' ? darkNavigationTheme : lightNavigationTheme;
 
@@ -65,12 +67,12 @@ export const RootNavigator = () => {
             <Stack.Screen
               name="AddItem"
               component={AddItemScreen}
-              options={{ presentation: 'modal', headerShown: true, title: 'Add Item' }}
+              options={{ presentation: 'modal', headerShown: true, title: t('addItem.addItem') }}
             />
             <Stack.Screen
               name="RecipeDetail"
               component={RecipeDetailScreen}
-              options={{ headerShown: true, title: 'Recipe' }}
+              options={{ headerShown: true, title: t('recipes.title') }}
             />
           </>
         ) : (

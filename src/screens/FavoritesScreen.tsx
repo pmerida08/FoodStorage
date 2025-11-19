@@ -1,12 +1,10 @@
-import { useMemo, useEffect, useState } from 'react';
+import { useMemo } from 'react';
 import { FlatList, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Heart, Clock, Users } from 'lucide-react-native';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import type { ThemeColors } from '@/providers/ThemeProvider';
-import { useTranslation } from 'react-i18next';
-import { useLanguage } from '@/providers/LanguageProvider';
-import { translateText } from '@/lib/i18n/contentTranslation';
+import { useTranslation } from '@/lib/i18n';
 
 const favorites = [
   { id: '1', name: 'Spaghetti Carbonara', time: '20 min', servings: 2 },
@@ -14,41 +12,22 @@ const favorites = [
   { id: '3', name: 'Chocolate Brownies', time: '35 min', servings: 8 },
 ] as const;
 
-type TranslatedFavorite = typeof favorites[number] & { translatedName: string };
-
 export const FavoritesScreen = () => {
   const { colors } = useThemeMode();
-  const { t } = useTranslation();
-  const { language } = useLanguage();
   const styles = useMemo(() => createStyles(colors), [colors]);
-
-  const [translatedFavorites, setTranslatedFavorites] = useState<TranslatedFavorite[]>(
-    favorites.map((f) => ({ ...f, translatedName: f.name })),
-  );
-
-  useEffect(() => {
-    const translateFavoriteNames = async () => {
-      const translated = await Promise.all(
-        favorites.map(async (favorite) => ({
-          ...favorite,
-          translatedName: await translateText(favorite.name, language),
-        })),
-      );
-      setTranslatedFavorites(translated);
-    };
-
-    translateFavoriteNames();
-  }, [language]);
+  const { t } = useTranslation();
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
       <FlatList
-        data={translatedFavorites}
+        data={favorites}
         keyExtractor={(item) => item.id}
         ListHeaderComponent={
           <View style={styles.header}>
             <Text style={styles.title}>{t('favorites.title')}</Text>
-            <Text style={styles.subtitle}>{favorites.length} {t('favorites.savedRecipes')}</Text>
+            <Text style={styles.subtitle}>
+              {favorites.length} {t('favorites.savedRecipes')}
+            </Text>
           </View>
         }
         ListHeaderComponentStyle={styles.listHeader}
@@ -57,7 +36,7 @@ export const FavoritesScreen = () => {
         renderItem={({ item }) => (
           <View style={styles.card}>
             <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.translatedName}</Text>
+              <Text style={styles.cardTitle}>{item.name}</Text>
               <Heart size={20} color={colors.danger} />
             </View>
             <View style={styles.metaRow}>
@@ -67,7 +46,9 @@ export const FavoritesScreen = () => {
               </View>
               <View style={styles.metaItem}>
                 <Users size={16} color={colors.textMuted} />
-                <Text style={styles.metaLabel}>{item.servings} {t('favorites.servings')}</Text>
+                <Text style={styles.metaLabel}>
+                  {item.servings} {t('favorites.servings')}
+                </Text>
               </View>
             </View>
           </View>

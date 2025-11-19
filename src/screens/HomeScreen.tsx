@@ -8,18 +8,18 @@ import { ChefHat, Package, Refrigerator, Snowflake, TrendingUp } from 'lucide-re
 import { useMemo } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/providers/AuthProvider';
 import { useQuery } from '@tanstack/react-query';
 import { getStorageItemsByLocation, getStorageStatistics } from '@/lib/supabase/storageService';
+import { useTranslation } from '@/lib/i18n';
 
 type Navigation = BottomTabNavigationProp<AppTabsParamList, 'Home'>;
 
 export const HomeScreen = () => {
   const navigation = useNavigation<Navigation>();
   const { colors } = useThemeMode();
-  const { t } = useTranslation();
   const { user } = useAuth();
+  const { t } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const { data: freezerItems = [] } = useQuery({
@@ -56,32 +56,35 @@ export const HomeScreen = () => {
     }).length;
   };
 
-  const storageData = useMemo(() => [
-    {
-      id: 'freezer',
-      name: t('home.freezer'),
-      items: freezerItems.length,
-      expiringSoon: getExpiringSoonCount(freezerItems),
-      icon: Snowflake,
-      color: '#38bdf8'
-    },
-    {
-      id: 'fridge',
-      name: t('home.fridge'),
-      items: fridgeItems.length,
-      expiringSoon: getExpiringSoonCount(fridgeItems),
-      icon: Refrigerator,
-      color: '#34d399'
-    },
-    {
-      id: 'larder',
-      name: t('home.larder'),
-      items: larderItems.length,
-      expiringSoon: getExpiringSoonCount(larderItems),
-      icon: Package,
-      color: '#facc15'
-    },
-  ], [t, freezerItems, fridgeItems, larderItems]);
+  const storageData = useMemo(
+    () => [
+      {
+        id: 'freezer',
+        name: t('home.freezer'),
+        items: freezerItems.length,
+        expiringSoon: getExpiringSoonCount(freezerItems),
+        icon: Snowflake,
+        color: '#38bdf8',
+      },
+      {
+        id: 'fridge',
+        name: t('home.fridge'),
+        items: fridgeItems.length,
+        expiringSoon: getExpiringSoonCount(fridgeItems),
+        icon: Refrigerator,
+        color: '#34d399',
+      },
+      {
+        id: 'larder',
+        name: t('home.larder'),
+        items: larderItems.length,
+        expiringSoon: getExpiringSoonCount(larderItems),
+        icon: Package,
+        color: '#facc15',
+      },
+    ],
+    [freezerItems, fridgeItems, larderItems, t],
+  );
 
   return (
     <SafeAreaView style={[styles.safeArea, { backgroundColor: colors.background }]}>
@@ -114,11 +117,15 @@ export const HomeScreen = () => {
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.cardTitle}>{storage.name}</Text>
-                  <Text style={styles.cardSubtitle}>{storage.items} {t('home.items')}</Text>
+                  <Text style={styles.cardSubtitle}>
+                    {storage.items} {t('home.items')}
+                  </Text>
                 </View>
                 {storage.expiringSoon > 0 && (
                   <View style={styles.expiringBadge}>
-                    <Text style={styles.expiringText}>{storage.expiringSoon} {t('home.expiring')}</Text>
+                    <Text style={styles.expiringText}>
+                      {storage.expiringSoon} {t('home.expiring')}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -131,9 +138,7 @@ export const HomeScreen = () => {
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.highlightTitle}>{t('home.smartRecipes')}</Text>
-              <Text style={styles.highlightSubtitle}>
-                {t('home.smartRecipesDesc')}
-              </Text>
+              <Text style={styles.highlightSubtitle}>{t('home.smartRecipesDesc')}</Text>
               <TouchableOpacity
                 style={styles.highlightButton}
                 onPress={() => navigation.navigate('Recipes')}
@@ -143,6 +148,13 @@ export const HomeScreen = () => {
               </TouchableOpacity>
             </View>
           </View>
+
+          <TouchableOpacity style={styles.manageCards} onPress={() => navigation.navigate('Cards')}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.manageCardsTitle}>{t('home.manageCards')}</Text>
+              <Text style={styles.manageCardsSubtitle}>{t('home.openCards')}</Text>
+            </View>
+          </TouchableOpacity>
 
           <View style={styles.statsRow}>
             <View style={[styles.statCard, { backgroundColor: colors.primary }]}>
@@ -287,6 +299,24 @@ const createStyles = (colors: ThemeColors) =>
     highlightButtonText: {
       color: colors.highlightButtonText,
       fontWeight: '700',
+    },
+    manageCards: {
+      marginTop: 16,
+      marginHorizontal: 24,
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      padding: 20,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    manageCardsTitle: {
+      fontSize: 16,
+      fontWeight: '700',
+      color: colors.textPrimary,
+    },
+    manageCardsSubtitle: {
+      marginTop: 4,
+      color: colors.textSecondary,
     },
     statsRow: {
       flexDirection: 'row',
