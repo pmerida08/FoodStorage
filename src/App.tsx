@@ -1,36 +1,39 @@
-import 'react-native-gesture-handler';
-import 'react-native-reanimated';
-import '@/lib/i18n';
-import { useState } from 'react';
-import { StatusBar } from 'expo-status-bar';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { RootNavigator } from '@/navigation/RootNavigator';
-import { AuthProvider } from '@/providers/AuthProvider';
-import { ToastProvider } from '@/providers/ToastProvider';
-import { ThemeProvider, useThemeMode } from '@/providers/ThemeProvider';
+import { ErrorBoundary } from "@/components/ErrorBoundary";
+import "@/lib/i18n";
+import { RootNavigator } from "@/navigation/RootNavigator";
+import { AuthProvider } from "@/providers/AuthProvider";
+import { ThemeProvider, useThemeMode } from "@/providers/ThemeProvider";
+import { ToastProvider } from "@/providers/ToastProvider";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { StatusBar } from "expo-status-bar";
+import { useState } from "react";
+import "react-native-gesture-handler";
+import "react-native-reanimated";
+import { SafeAreaProvider } from "react-native-safe-area-context";
 
 const ThemeStatusBar = () => {
   const { mode } = useThemeMode();
-  return <StatusBar style={mode === 'dark' ? 'light' : 'dark'} />;
+  return <StatusBar style={mode === "dark" ? "light" : "dark"} />;
 };
 
 export const App = () => {
   const [queryClient] = useState(() => new QueryClient());
 
   return (
-    <SafeAreaProvider>
-      <QueryClientProvider client={queryClient}>
-        <AuthProvider>
-          <ThemeProvider>
-            <ToastProvider>
-              <ThemeStatusBar />
-              <RootNavigator />
-            </ToastProvider>
-          </ThemeProvider>
-        </AuthProvider>
-      </QueryClientProvider>
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <QueryClientProvider client={queryClient}>
+          <AuthProvider>
+            <ThemeProvider>
+              <ToastProvider>
+                <ThemeStatusBar />
+                <RootNavigator />
+              </ToastProvider>
+            </ThemeProvider>
+          </AuthProvider>
+        </QueryClientProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 };
 

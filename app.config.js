@@ -48,10 +48,14 @@ module.exports = {
       ],
     ],
     extra: {
+      supabaseUrl: process.env.EXPO_PUBLIC_SUPABASE_URL,
+      supabaseAnonKey: process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY,
+      supabaseProjectId: process.env.EXPO_PUBLIC_SUPABASE_PROJECT_ID,
       translationApiKey: process.env.EXPO_PUBLIC_TRANSLATION_API_KEY,
       ocrApiKey:
         process.env.EXPO_PUBLIC_OCR_API_KEY ||
         process.env.EXPO_PUBLIC_TRANSLATION_API_KEY,
+      n8nApiKey: process.env.EXPO_PUBLIC_N8N_API_KEY,
       eas: {
         projectId: "14ee0f97-ef2c-460f-b5d3-7c8f060891b8",
       },
