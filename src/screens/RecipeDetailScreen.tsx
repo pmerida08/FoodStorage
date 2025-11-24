@@ -111,16 +111,29 @@ export const RecipeDetailScreen = () => {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>{t("recipes.ingredients")}</Text>
           <View style={styles.card}>
-            {ingredients.map((ingredient: any, index: number) => (
-              <View key={`ing-${index}`} style={styles.ingredientRow}>
-                <View style={styles.bullet} />
-                <Text style={styles.item}>
-                  {typeof ingredient === "string"
-                    ? ingredient
-                    : JSON.stringify(ingredient)}
-                </Text>
-              </View>
-            ))}
+            {ingredients.map((ingredient: any, index: number) => {
+              // Handle both formats: string or {item, quantity}
+              const isObject =
+                typeof ingredient === "object" && ingredient !== null;
+              const itemName = isObject ? ingredient.item : ingredient;
+              const itemQuantity = isObject ? ingredient.quantity : null;
+
+              return (
+                <View key={`ing-${index}`} style={styles.ingredientRow}>
+                  <View style={styles.bullet} />
+                  <View style={styles.ingredientContent}>
+                    <Text style={styles.item}>
+                      {itemName || JSON.stringify(ingredient)}
+                    </Text>
+                    {itemQuantity && (
+                      <Text style={styles.ingredientQuantity}>
+                        {itemQuantity}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+              );
+            })}
           </View>
         </View>
 
@@ -224,6 +237,17 @@ const createStyles = (colors: ThemeColors) =>
       flexDirection: "row",
       alignItems: "center",
       gap: 12,
+    },
+    ingredientContent: {
+      flex: 1,
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+    },
+    ingredientQuantity: {
+      fontSize: 14,
+      fontWeight: "600",
+      color: colors.textSecondary,
     },
     bullet: {
       width: 6,
