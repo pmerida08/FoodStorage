@@ -1,4 +1,22 @@
-import { useMemo, useState, useCallback } from 'react';
+import { useTranslation } from '@/lib/i18n';
+import { parseReceiptLines, recognizeReceiptText } from '@/lib/ocr';
+import { createStorageItem, getStorageLocations } from '@/lib/supabase/storageService';
+import type { RootStackParamList } from '@/navigation/types';
+import { useAuth } from '@/providers/AuthProvider';
+import type { ThemeColors } from '@/providers/ThemeProvider';
+import { useThemeMode } from '@/providers/ThemeProvider';
+import { useToast } from '@/providers/ToastProvider';
+import DateTimePicker, {
+  DateTimePickerAndroid,
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
+import { useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import * as ImageManipulator from 'expo-image-manipulator';
+import * as ImagePicker from 'expo-image-picker';
+import { Camera, Check, Edit3, Trash2 } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -11,24 +29,6 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import { Camera, Check, Edit3, Trash2 } from 'lucide-react-native';
-import * as ImagePicker from 'expo-image-picker';
-import * as ImageManipulator from 'expo-image-manipulator';
-import DateTimePicker, {
-  DateTimePickerAndroid,
-  type DateTimePickerEvent,
-} from '@react-native-community/datetimepicker';
-import type { RootStackParamList } from '@/navigation/types';
-import { useToast } from '@/providers/ToastProvider';
-import { useThemeMode } from '@/providers/ThemeProvider';
-import type { ThemeColors } from '@/providers/ThemeProvider';
-import { useTranslation } from '@/lib/i18n';
-import { useAuth } from '@/providers/AuthProvider';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { getStorageLocations, createStorageItem } from '@/lib/supabase/storageService';
-import { parseReceiptLines, recognizeReceiptText } from '@/lib/ocr';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -123,7 +123,7 @@ export const AddItemScreen = () => {
   const navigation = useNavigation<Navigation>();
   const { showToast } = useToast();
   const { colors } = useThemeMode();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -421,7 +421,7 @@ export const AddItemScreen = () => {
         return;
       }
 
-      const parsedItems = await parseReceiptLines(lines);
+      const parsedItems = await parseReceiptLines(lines, locale);
       if (!parsedItems.length) {
         showToast({
           title: t('addItem.ocrNoItemsTitle'),

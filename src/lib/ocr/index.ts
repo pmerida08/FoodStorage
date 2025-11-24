@@ -1,5 +1,5 @@
-import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
+import * as FileSystem from 'expo-file-system/legacy';
 
 type RecognizeResult = {
   lines: string[];
@@ -38,9 +38,11 @@ const OCR_API_KEY = ocrApiKey || translationApiKey || '';
 const RECEIPT_OCR_PROMPT =
   'You are an OCR assistant that extracts every readable line from grocery receipts. Output a strict JSON object with a single key "lines" containing the text lines in top-to-bottom order. Do not add explanations.';
 
-const RECEIPT_ITEM_PROMPT = `You are a purchasing assistant. From grocery receipt lines, extract ONLY edible items (meals, ingredients, food staples).
+const RECEIPT_ITEM_PROMPT = (language: string) => `You are a purchasing assistant. From grocery receipt lines, extract ONLY edible items (meals, ingredients, food staples).
 - Ignore totals, payments, discounts, loyalty information, and store metadata.
-- Translate every item name to English.
+- STRICTLY EXCLUDE non-food items (cleaning products, toiletries, packaging, etc.).
+- Output the name in ${language === 'es' ? 'Spanish' : 'English'}.
+- Normalize the name to the generic product name (e.g., use "Leche" instead of "Leche Entera Alpura", "Yogurt" instead of "Yogurt Fresa Danone").
 - Return strict JSON: {"items":[{"name":"string","quantity":"number as string","unit":"string"}]}
 - Default quantity to "1" when absent. Default unit to "pcs" when ambiguous.
 - Preserve the numeric quantity that appears on the receipt (e.g. "2", "1.5").`;
@@ -317,7 +319,7 @@ export const recognizeReceiptText = async (imageUri: string): Promise<RecognizeR
         messages: [
           {
             role: 'system',
-            content: RECEIPT_OCR_PROMPT,
+            content: 'You are an OCR assistant that extracts every readable line from grocery receipts. Output a strict JSON object with a single key "lines" containing the text lines in top-to-bottom order. Do not add explanations.',
           },
           {
             role: 'user',
@@ -404,7 +406,7 @@ const sanitizeModelItems = (input: unknown): ParsedReceiptItem[] => {
   return normalized;
 };
 
-const extractMealsWithModel = async (lines: string[]): Promise<ParsedReceiptItem[]> => {
+const extractMealsWithModel = async (lines: string[], language: string = 'en'): Promise<ParsedReceiptItem[]> => {
   if (!lines.length) {
     return [];
   }
@@ -418,11 +420,11 @@ const extractMealsWithModel = async (lines: string[]): Promise<ParsedReceiptItem
     body: JSON.stringify({
       model: GPT_VISION_MODEL,
       temperature: 0,
-      max_tokens: 600,
+      max_tokens: 3000,
       messages: [
         {
           role: 'system',
-          content: RECEIPT_ITEM_PROMPT,
+          content: RECEIPT_ITEM_PROMPT(language),
         },
         {
           role: 'user',
@@ -441,7 +443,9 @@ const extractMealsWithModel = async (lines: string[]): Promise<ParsedReceiptItem
   const payload = await response.json();
   const rawContent = extractContentText(payload?.choices?.[0]?.message?.content);
   const sanitized = rawContent.replace(/```(?:json)?/gi, '').trim();
+  
   if (!sanitized) {
+    console.warn('Receipt item extraction returned empty content');
     return [];
   }
 
@@ -453,11 +457,13 @@ const extractMealsWithModel = async (lines: string[]): Promise<ParsedReceiptItem
     if (Array.isArray(parsed?.items)) {
       return sanitizeModelItems(parsed.items);
     }
+    console.warn('Receipt item extraction returned unexpected format:', parsed);
+    return [];
   } catch (error) {
     console.error('Failed to parse receipt item extraction response', error);
+    console.error('Raw content was:', sanitized.substring(0, 500)); // Log first 500 chars
+    return [];
   }
-
-  return [];
 };
 
 const parseLinesHeuristically = (lines: string[]): ParsedReceiptItem[] => {
@@ -485,7 +491,7 @@ const parseLinesHeuristically = (lines: string[]): ParsedReceiptItem[] => {
   return items;
 };
 
-export const parseReceiptLines = async (lines: string[]): Promise<ParsedReceiptItem[]> => {
+export const parseReceiptLines = async (lines: string[], language: string = 'en'): Promise<ParsedReceiptItem[]> => {
   if (!lines.length) {
     return [];
   }
@@ -495,7 +501,7 @@ export const parseReceiptLines = async (lines: string[]): Promise<ParsedReceiptI
   }
 
   try {
-    const aiItems = await extractMealsWithModel(lines);
+    const aiItems = await extractMealsWithModel(lines, language);
     if (aiItems.length) {
       return aiItems;
     }
@@ -506,4 +512,5 @@ export const parseReceiptLines = async (lines: string[]): Promise<ParsedReceiptI
   return parseLinesHeuristically(lines);
 };
 
-export type { RecognizeResult, ParsedReceiptItem };
+export type { ParsedReceiptItem, RecognizeResult };
+

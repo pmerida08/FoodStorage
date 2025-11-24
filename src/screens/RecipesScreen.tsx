@@ -1,19 +1,19 @@
-import { useMemo, useState } from 'react';
-import { FlatList, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, Sparkles, Clock, Users } from 'lucide-react-native';
-import { useNavigation } from '@react-navigation/native';
-import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
-import type { RootStackParamList } from '@/navigation/types';
-import { useThemeMode } from '@/providers/ThemeProvider';
-import type { ThemeColors } from '@/providers/ThemeProvider';
 import { useTranslation } from '@/lib/i18n';
+import { getUserRecipes } from '@/lib/supabase/recipesService';
+import { getStorageItems } from '@/lib/supabase/storageService';
+import type { RootStackParamList } from '@/navigation/types';
+import { useAuth } from '@/providers/AuthProvider';
+import type { ThemeColors } from '@/providers/ThemeProvider';
+import { useThemeMode } from '@/providers/ThemeProvider';
+import { generateSmartRecipes } from '@/services/n8n';
+import { useFocusEffect, useNavigation } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+import { Clock, Search, Sparkles, Users } from 'lucide-react-native';
+import { useCallback, useMemo, useState } from 'react';
+import { FlatList, Image, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-const mockRecipes = [
-  { id: '1', name: 'Creamy Chicken Pasta', matchScore: 85, time: '25 min', servings: 4, missing: 2 },
-  { id: '2', name: 'Beef Tacos', matchScore: 70, time: '20 min', servings: 3, missing: 3 },
-  { id: '3', name: 'Cheese Omelette', matchScore: 95, time: '10 min', servings: 2, missing: 0 },
-] as const;
+import type { SmartRecipe } from '@/services/n8n';
 
 type Navigation = NativeStackNavigationProp<RootStackParamList>;
 
@@ -22,16 +22,59 @@ export const RecipesScreen = () => {
   const [query, setQuery] = useState('');
   const [generating, setGenerating] = useState(false);
   const { colors } = useThemeMode();
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
   const styles = useMemo(() => createStyles(colors), [colors]);
-  const filtered = useMemo(
-    () => mockRecipes.filter((recipe) => recipe.name.toLowerCase().includes(query.toLowerCase())),
-    [query],
+  const { user } = useAuth();
+  const [recipes, setRecipes] = useState<SmartRecipe[]>([]);
+
+  const fetchRecipes = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const userRecipes = await getUserRecipes(user.id);
+      const mappedRecipes: SmartRecipe[] = userRecipes.map((r) => ({
+        id: r.id,
+        name: r.name,
+        matchScore: 100,
+        time: r.cook_time ? `${r.cook_time}` : '30',
+        servings: r.servings || 2,
+        missing: 0,
+        image_url: r.image_url || undefined,
+      }));
+      setRecipes(mappedRecipes);
+    } catch (error) {
+      console.error('Failed to fetch recipes:', error);
+    }
+  }, [user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      fetchRecipes();
+    }, [fetchRecipes])
   );
 
-  const handleGenerate = () => {
+  const filtered = useMemo(
+    () => recipes.filter((recipe) => recipe.name.toLowerCase().includes(query.toLowerCase())),
+    [query, recipes],
+  );
+
+  const handleGenerate = async () => {
+    if (!user?.id) return;
+    
     setGenerating(true);
-    setTimeout(() => setGenerating(false), 1500);
+    try {
+      const storageItems = await getStorageItems(user.id);
+      const ingredients = storageItems.map(item => item.name);
+      
+      const newRecipes = await generateSmartRecipes(ingredients, user.id, locale);
+      
+      if (newRecipes.length > 0) {
+        setRecipes(prev => [...newRecipes, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to generate recipes:', error);
+    } finally {
+      setGenerating(false);
+    }
   };
 
   return (
@@ -83,43 +126,52 @@ export const RecipesScreen = () => {
             style={styles.card}
             onPress={() => navigation.navigate('RecipeDetail', { id: item.id })}
           >
-            <View style={styles.cardHeader}>
-              <Text style={styles.cardTitle}>{item.name}</Text>
-              <View style={styles.match}>
-                <Text style={styles.matchValue}>{item.matchScore}%</Text>
-                <Text style={styles.matchLabel}>{t('recipes.match')}</Text>
+            {item.image_url ? (
+              <Image source={{ uri: item.image_url }} style={styles.cardImage} />
+            ) : (
+              <View style={[styles.cardImage, styles.cardImagePlaceholder]}>
+                <Sparkles size={32} color={colors.textMuted} />
               </View>
-            </View>
-            <View style={styles.metaRow}>
-              <View style={styles.metaItem}>
-                <Clock size={16} color={colors.textMuted} />
-                <Text style={styles.metaLabel}>{item.time}</Text>
+            )}
+            <View style={styles.cardContent}>
+              <View style={styles.cardHeader}>
+                <Text style={styles.cardTitle} numberOfLines={2}>{item.name}</Text>
+                <View style={styles.match}>
+                  <Text style={styles.matchValue}>{item.matchScore}%</Text>
+                  <Text style={styles.matchLabel}>{t('recipes.match')}</Text>
+                </View>
               </View>
-              <View style={styles.metaItem}>
-                <Users size={16} color={colors.textMuted} />
-                <Text style={styles.metaLabel}>
-                  {item.servings} {t('recipes.servings')}
-                </Text>
+              <View style={styles.metaRow}>
+                <View style={styles.metaItem}>
+                  <Clock size={16} color={colors.textMuted} />
+                  <Text style={styles.metaLabel}>{item.time}</Text>
+                </View>
+                <View style={styles.metaItem}>
+                  <Users size={16} color={colors.textMuted} />
+                  <Text style={styles.metaLabel}>
+                    {item.servings} {t('recipes.servings')}
+                  </Text>
+                </View>
               </View>
-            </View>
-            <View
-              style={[
-                styles.missingBadge,
-                item.missing === 0
-                  ? { backgroundColor: colors.successSoft, borderColor: colors.success }
-                  : { backgroundColor: colors.warningSoft, borderColor: colors.warning },
-              ]}
-            >
-              <Text
+              <View
                 style={[
-                  styles.missingLabel,
-                  item.missing === 0 ? { color: colors.success } : { color: colors.warning },
+                  styles.missingBadge,
+                  item.missing === 0
+                    ? { backgroundColor: colors.successSoft, borderColor: colors.success }
+                    : { backgroundColor: colors.warningSoft, borderColor: colors.warning },
                 ]}
               >
-                {item.missing === 0
-                  ? t('recipes.allIngredientsAvailable')
-                  : `${item.missing} ${t('recipes.ingredientsNeeded')}`}
-              </Text>
+                <Text
+                  style={[
+                    styles.missingLabel,
+                    item.missing === 0 ? { color: colors.success } : { color: colors.warning },
+                  ]}
+                >
+                  {item.missing === 0
+                    ? t('recipes.allIngredientsAvailable')
+                    : `${item.missing} ${t('recipes.ingredientsNeeded')}`}
+                </Text>
+              </View>
             </View>
           </TouchableOpacity>
         )}
@@ -201,13 +253,26 @@ const createStyles = (colors: ThemeColors) =>
       marginHorizontal: 24,
       backgroundColor: colors.surface,
       borderRadius: 18,
-      padding: 20,
-      gap: 14,
       shadowColor: colors.shadow,
       shadowOpacity: 0.05,
       shadowRadius: 12,
       shadowOffset: { width: 0, height: 8 },
       elevation: 2,
+      overflow: 'hidden',
+    },
+    cardImage: {
+      width: '100%',
+      height: 180,
+      resizeMode: 'cover',
+    },
+    cardImagePlaceholder: {
+      backgroundColor: colors.surfaceMuted,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cardContent: {
+      padding: 20,
+      gap: 14,
     },
     cardHeader: {
       flexDirection: 'row',

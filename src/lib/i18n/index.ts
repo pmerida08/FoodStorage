@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { I18n } from 'i18n-js';
-import * as RNLocalize from 'react-native-localize';
+import * as Localization from 'expo-localization';
 import en from '@/locales/en.json';
 import es from '@/locales/es.json';
 
@@ -15,8 +15,9 @@ i18n.defaultLocale = 'en';
 const fallback: { languageTag: SupportedLanguage } = { languageTag: 'en' };
 
 const selectBestLanguage = (): SupportedLanguage => {
-  const bestLanguage = RNLocalize.findBestAvailableLanguage(Object.keys(translations));
-  return (bestLanguage?.languageTag as SupportedLanguage) ?? fallback.languageTag;
+  const locales = Localization.getLocales();
+  const bestLanguage = locales?.find((locale) => Object.keys(translations).includes(locale.languageCode ?? ''));
+  return (bestLanguage?.languageCode as SupportedLanguage) ?? fallback.languageTag;
 };
 
 const setI18nConfig = (nextLocale?: SupportedLanguage) => {
@@ -31,15 +32,16 @@ export const useTranslation = () => {
   const [, forceUpdate] = useState(0);
 
   useEffect(() => {
+    // Expo Localization doesn't have a direct event listener for language changes in the same way.
+    // Usually, the app restarts on Android when language changes.
+    // For iOS, we might need to check on AppState change, but for now we'll keep it simple.
     const handleLocalizationChange = () => {
       setI18nConfig();
       forceUpdate((value) => value + 1);
     };
-
-    RNLocalize.addEventListener('change', handleLocalizationChange);
-    return () => {
-      RNLocalize.removeEventListener('change', handleLocalizationChange);
-    };
+    
+    // Placeholder for future implementation if needed
+    return () => {};
   }, []);
 
   const t = useCallback(

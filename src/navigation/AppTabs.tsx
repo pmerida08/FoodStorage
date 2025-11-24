@@ -1,3 +1,4 @@
+import { useTranslation } from '@/lib/i18n';
 import type { AppTabsParamList } from '@/navigation/types';
 import { useThemeMode } from '@/providers/ThemeProvider';
 import { FavoritesScreen } from '@/screens/FavoritesScreen';
@@ -5,13 +6,11 @@ import { HomeScreen } from '@/screens/HomeScreen';
 import { ProfileScreen } from '@/screens/ProfileScreen';
 import { RecipesScreen } from '@/screens/RecipesScreen';
 import { StorageScreen } from '@/screens/StorageScreen';
-import { CardsScreen } from '@/screens/CardsScreen';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { useTheme } from '@react-navigation/native';
-import { ChefHat, FileText, Heart, Home, Package, User } from 'lucide-react-native';
+import { ChefHat, Heart, Home, Package, User } from 'lucide-react-native';
 import { useEffect, useRef } from 'react';
 import { Animated } from 'react-native';
-import { useTranslation } from '@/lib/i18n';
 
 const Tab = createBottomTabNavigator<AppTabsParamList>();
 
@@ -63,7 +62,6 @@ export const AppTabs = () => {
     Home: t('navigation.home'),
     Storage: t('navigation.storage'),
     Recipes: t('navigation.recipes'),
-    Cards: t('navigation.cards'),
     Favorites: t('navigation.favorites'),
     Profile: t('navigation.profile'),
   } as const;
@@ -75,7 +73,6 @@ export const AppTabs = () => {
           Home,
           Storage: Package,
           Recipes: ChefHat,
-          Cards: FileText,
           Favorites: Heart,
           Profile: User,
         } as const;
@@ -115,7 +112,6 @@ export const AppTabs = () => {
       <Tab.Screen name="Home" component={HomeScreen} />
       <Tab.Screen name="Storage" component={StorageScreen} />
       <Tab.Screen name="Recipes" component={RecipesScreen} />
-      <Tab.Screen name="Cards" component={CardsScreen} />
       <Tab.Screen name="Favorites" component={FavoritesScreen} />
       <Tab.Screen name="Profile" component={ProfileScreen} />
     </Tab.Navigator>

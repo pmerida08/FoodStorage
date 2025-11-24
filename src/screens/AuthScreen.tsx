@@ -1,20 +1,20 @@
+import { useTranslation } from '@/lib/i18n';
+import { supabase } from '@/lib/supabase/client';
+import { useAuth } from '@/providers/AuthProvider';
+import type { ThemeColors } from '@/providers/ThemeProvider';
+import { useThemeMode } from '@/providers/ThemeProvider';
+import { useToast } from '@/providers/ToastProvider';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
+    KeyboardAvoidingView,
+    Platform,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-import { supabase } from '@/lib/supabase/client';
-import { useToast } from '@/providers/ToastProvider';
-import { useAuth } from '@/providers/AuthProvider';
-import { useThemeMode } from '@/providers/ThemeProvider';
-import type { ThemeColors } from '@/providers/ThemeProvider';
-import { useTranslation } from '@/lib/i18n';
 
 type Mode = 'signin' | 'signup';
 
@@ -94,7 +94,7 @@ export const AuthScreen = () => {
       behavior={Platform.select({ ios: 'padding', android: undefined })}
     >
       <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
-        <Text style={styles.title}>{AUTH_COPY.title}</Text>
+        <Text style={styles.title}>{t('auth.title')}</Text>
         <Text style={styles.subtitle}>
           {mode === 'signin' ? t('auth.signInSubtitle') : t('auth.signUpSubtitle')}
         </Text>
